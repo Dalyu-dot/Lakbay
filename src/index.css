@@ -8,50 +8,50 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Medical theme - Clean and Clinical */
-    --background: 0 0% 100%;
-    --foreground: 210 26% 25%;
+    /* UP color scheme: white (main), red, green */
+    --background: 0 0% 100%; /* white */
+    --foreground: 210 10% 15%; /* near-black text */
 
     --card: 0 0% 100%;
-    --card-foreground: 210 26% 25%;
+    --card-foreground: 210 10% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 210 26% 25%;
+    --popover-foreground: 210 10% 15%;
 
-    /* Medical Green for primary actions */
-    --primary: 167 46% 53%;
+    /* Primary: Red */
+    --primary: 0 72% 45%; /* vivid red */
     --primary-foreground: 0 0% 100%;
 
-    /* Light Blue for secondary elements */
-    --secondary: 210 62% 90%;
-    --secondary-foreground: 210 26% 25%;
+    /* Secondary: Green */
+    --secondary: 149 40% 45%; /* UP green-ish */
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 210 62% 95%;
-    --muted-foreground: 210 26% 45%;
+    --muted: 210 20% 96%;
+    --muted-foreground: 210 10% 40%;
 
-    --accent: 167 46% 53%;
+    --accent: 149 40% 45%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 0 72% 45%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 210 40% 85%;
-    --input: 210 40% 85%;
-    --ring: 167 46% 53%;
+    --border: 210 20% 88%;
+    --input: 210 20% 88%;
+    --ring: 0 72% 45%;
 
     --radius: 0.5rem;
 
     /* Status colors */
-    --success: 167 46% 53%;
+    --success: 149 40% 45%;
     --warning: 45 93% 47%;
-    --danger: 0 72% 51%;
+    --danger: 0 72% 45%;
 
     /* Gradient for hero sections */
-    --gradient-primary: linear-gradient(135deg, hsl(167 46% 53%), hsl(210 62% 75%));
+    --gradient-primary: linear-gradient(135deg, hsl(0 72% 45%), hsl(149 40% 45%));
     
     /* Shadows */
-    --shadow-soft: 0 2px 8px rgba(46, 64, 83, 0.08);
-    --shadow-medium: 0 4px 16px rgba(46, 64, 83, 0.12);
+    --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --shadow-medium: 0 4px 16px rgba(0, 0, 0, 0.12);
   }
 }
 

@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, Users, FileText, Bell, BarChart3, Shield } from "lucide-react";
+import { Activity } from "lucide-react";
 
 const Landing = () => {
   return (
@@ -10,7 +10,7 @@ const Landing = () => {
       <header className="border-b border-border bg-card shadow-sm">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <Activity className="h-8 w-8 text-primary" />
+            <img src="/lungs.png" alt="LAKBAY" className="h-8 w-8" />
             <h1 className="text-2xl font-bold text-foreground">LAKBAY</h1>
           </div>
           <Link to="/auth">
@@ -46,61 +46,43 @@ const Landing = () => {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             <Card>
               <CardHeader>
-                <Activity className="h-10 w-10 text-primary mb-2" />
-                <CardTitle>Real-Time Tracking</CardTitle>
-                <CardDescription>
-                  Monitor case progress from imaging to management with live updates
-                </CardDescription>
+                <CardTitle>Tracking</CardTitle>
+                <CardDescription>Track case progress.</CardDescription>
               </CardHeader>
             </Card>
 
             <Card>
               <CardHeader>
-                <FileText className="h-10 w-10 text-primary mb-2" />
-                <CardTitle>Standardized Documentation</CardTitle>
-                <CardDescription>
-                  Structured clinical data entry following best practices
-                </CardDescription>
+                <CardTitle>Documentation</CardTitle>
+                <CardDescription>Enter clinical data.</CardDescription>
               </CardHeader>
             </Card>
 
             <Card>
               <CardHeader>
-                <Bell className="h-10 w-10 text-primary mb-2" />
-                <CardTitle>Automated Alerts</CardTitle>
-                <CardDescription>
-                  Get notified about overdue or pending stages automatically
-                </CardDescription>
+                <CardTitle>Alerts</CardTitle>
+                <CardDescription>Get notifications.</CardDescription>
               </CardHeader>
             </Card>
 
             <Card>
               <CardHeader>
-                <Users className="h-10 w-10 text-primary mb-2" />
-                <CardTitle>Role-Based Access</CardTitle>
-                <CardDescription>
-                  Dedicated views for Providers, Patients, and Administrators
-                </CardDescription>
+                <CardTitle>Roles</CardTitle>
+                <CardDescription>Views for each role.</CardDescription>
               </CardHeader>
             </Card>
 
             <Card>
               <CardHeader>
-                <BarChart3 className="h-10 w-10 text-primary mb-2" />
-                <CardTitle>Visual Analytics</CardTitle>
-                <CardDescription>
-                  Comprehensive dashboards with charts and timeline views
-                </CardDescription>
+                <CardTitle>Analytics</CardTitle>
+                <CardDescription>See charts and trends.</CardDescription>
               </CardHeader>
             </Card>
 
             <Card>
               <CardHeader>
-                <Shield className="h-10 w-10 text-primary mb-2" />
-                <CardTitle>Secure & Private</CardTitle>
-                <CardDescription>
-                  Role-restricted access ensuring data privacy and security
-                </CardDescription>
+                <CardTitle>Security</CardTitle>
+                <CardDescription>Keep data private.</CardDescription>
               </CardHeader>
             </Card>
           </div>
