@@ -11,11 +11,11 @@ import { toast } from "@/hooks/use-toast";
 
 const NewCase = () => {
   const navigate = useNavigate();
+  const today = new Date().toISOString().split("T")[0];
   const [formData, setFormData] = useState({
     patientId: "",
-    dateOfEncounter: "",
+    dateOfEncounter: today,
     physician: "",
-    hospital: "",
     classification: "",
     symptoms: "",
     imagingDate: "",
@@ -25,6 +25,38 @@ const NewCase = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Persist to localStorage for Provider Dashboard tracking
+    const existing = localStorage.getItem("providerCases");
+    const cases = existing ? JSON.parse(existing) as any[] : [];
+    const newCase = {
+      id: `P-${String(cases.length + 1).padStart(3, "0")}`,
+      patientIdentifier: formData.patientId,
+      institution: "", // removed from form
+      currentStage: "New Case",
+      duration: 0,
+      alert: "normal",
+      classification:
+        formData.classification === "nodule"
+          ? "Pulmonary nodule"
+          : formData.classification === "nodule-with-malignancy"
+          ? "Pulmonary nodule with extrathoracic malignancy"
+          : formData.classification === "mass"
+          ? "Pulmonary mass"
+          : formData.classification === "mass-with-malignancy"
+          ? "Pulmonary mass with extrathoracic malignancy"
+          : "Unspecified",
+      meta: {
+        dateOfEncounter: formData.dateOfEncounter,
+        physician: formData.physician,
+        symptoms: formData.symptoms,
+        imagingDate: formData.imagingDate,
+        imagingType: formData.imagingType,
+        findings: formData.findings,
+      },
+    };
+    localStorage.setItem("providerCases", JSON.stringify([newCase, ...cases]));
+
     toast({
       title: "Case created successfully",
       description: "The patient case has been added to the system.",
@@ -79,17 +111,6 @@ const NewCase = () => {
                     placeholder="Dr. Name"
                     value={formData.physician}
                     onChange={(e) => handleChange("physician", e.target.value)}
-                    required
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="hospital">Hospital/Institution *</Label>
-                  <Input
-                    id="hospital"
-                    placeholder="Hospital name"
-                    value={formData.hospital}
-                    onChange={(e) => handleChange("hospital", e.target.value)}
                     required
                   />
                 </div>

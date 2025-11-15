@@ -1,13 +1,12 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Search, Download, Users, Activity, AlertTriangle, TrendingUp } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-// Mock data
+// Mock data (preserve for existing cases)
 const systemOverview = [
   {
     id: 1,
@@ -38,18 +37,80 @@ const systemOverview = [
   },
 ];
 
+// Also bring in providerMockCases from before plus provider-created cases.
+const providerMockCases = [
+  {
+    id: "P-001",
+    patientIdentifier: "JD-2025-001",
+    currentStage: "Biopsy Pending",
+    duration: 12,
+    alert: "overdue",
+    classification: "Pulmonary nodule",
+  },
+  {
+    id: "P-002",
+    patientIdentifier: "SM-2025-002",
+    currentStage: "MDC Review",
+    duration: 5,
+    alert: "normal",
+    classification: "Pulmonary mass",
+  },
+  {
+    id: "P-003",
+    patientIdentifier: "RB-2025-003",
+    currentStage: "Imaging Follow-up",
+    duration: 20,
+    alert: "warning",
+    classification: "Pulmonary nodule with extrathoracic malignancy",
+  },
+];
+
 const AdminDashboard = () => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterInstitution, setFilterInstitution] = useState("all");
 
-  const filteredData = systemOverview.filter((item) => {
-    const matchesSearch = item.patientId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.provider.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesInstitution = filterInstitution === "all" || item.institution === filterInstitution;
-    return matchesSearch && matchesInstitution;
+  // Combine all cases for stats and overview table.
+  const { totalCount, activeCount, overdueCount, completedCount, allCases } = useMemo(() => {
+    try {
+      const stored = localStorage.getItem("providerCases");
+      const archivedRaw = localStorage.getItem("archivedCaseIds");
+      const storedCases = stored ? JSON.parse(stored) : [];
+      const archivedIds = archivedRaw ? JSON.parse(archivedRaw) : [];
+      // providerMockCases and storedCases use the same structure; systemOverview is separate
+      const all = [
+        ...storedCases.map((c) => ({
+          id: c.id,
+          patientId: c.patientIdentifier,
+          provider: c.meta?.physician || "—",
+          institution: c.meta?.institution || "—",
+          stage: c.currentStage,
+          duration: c.duration,
+          alert: c.alert,
+        })),
+        // Optionally include systemOverview (comment out if you only want live/tracked cases):
+        ...systemOverview,
+      ];
+      const active = all.filter((c) => !archivedIds.includes(c.id));
+      const archived = all.filter((c) => archivedIds.includes(c.id));
+      return {
+        totalCount: active.length,
+        activeCount: active.length,
+        overdueCount: active.filter((c) => c.alert === "overdue").length,
+        completedCount: archived.length,
+        allCases: active,
+      };
+    } catch {
+      return { totalCount: 0, activeCount: 0, overdueCount: 0, completedCount: 0, allCases: [] };
+    }
+  }, []);
+
+  const filteredData = allCases.filter((item) => {
+    // Allow for missing provider data for new cases
+    const matchesSearch = (item.patientId || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (item.provider || "").toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesSearch;
   });
 
-  const getAlertBadge = (alert: string) => {
+  const getAlertBadge = (alert) => {
     switch (alert) {
       case "overdue":
         return <Badge variant="destructive">Overdue</Badge>;
@@ -68,17 +129,16 @@ const AdminDashboard = () => {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Patients
+                Total Cases
               </CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-foreground">48</div>
-            <p className="text-xs text-muted-foreground mt-1">Across all providers</p>
+            <div className="text-3xl font-bold text-foreground">{totalCount}</div>
+            <p className="text-xs text-muted-foreground mt-1">Across active list</p>
           </CardContent>
         </Card>
-        
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -89,42 +149,39 @@ const AdminDashboard = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-primary">36</div>
+            <div className="text-3xl font-bold text-primary">{activeCount}</div>
             <p className="text-xs text-muted-foreground mt-1">Currently in progress</p>
           </CardContent>
         </Card>
-        
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Alerts
+                Overdue
               </CardTitle>
               <AlertTriangle className="h-4 w-4 text-muted-foreground" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-destructive">7</div>
+            <div className="text-3xl font-bold text-destructive">{overdueCount}</div>
             <p className="text-xs text-muted-foreground mt-1">Require attention</p>
           </CardContent>
         </Card>
-        
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Avg. Duration
+                Completed
               </CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-foreground">14.3</div>
-            <p className="text-xs text-muted-foreground mt-1">Days per case</p>
+            <div className="text-3xl font-bold text-foreground">{completedCount}</div>
+            <p className="text-xs text-muted-foreground mt-1">Archived cases</p>
           </CardContent>
         </Card>
       </div>
-
       {/* Filters and Search */}
       <Card className="mb-6">
         <CardContent className="pt-6">
@@ -134,22 +191,10 @@ const AdminDashboard = () => {
               <Input
                 placeholder="Search by patient ID or provider..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={e => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
             </div>
-            
-            <Select value={filterInstitution} onValueChange={setFilterInstitution}>
-              <SelectTrigger className="md:w-[240px]">
-                <SelectValue placeholder="Filter by institution" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Institutions</SelectItem>
-                <SelectItem value="Metro Hospital">Metro Hospital</SelectItem>
-                <SelectItem value="City Medical Center">City Medical Center</SelectItem>
-              </SelectContent>
-            </Select>
-
             <Button variant="outline">
               <Download className="h-4 w-4 mr-2" />
               Export
@@ -157,13 +202,12 @@ const AdminDashboard = () => {
           </div>
         </CardContent>
       </Card>
-
       {/* System Overview Table */}
       <Card>
         <CardHeader>
           <CardTitle>System Overview</CardTitle>
           <CardDescription>
-            Monitor all cases across providers and institutions
+            Monitor all cases across providers & institutions
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -192,7 +236,7 @@ const AdminDashboard = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredData.map((item) => (
+                {filteredData.map(item => (
                   <tr
                     key={item.id}
                     className="border-b border-border hover:bg-secondary/30 transition-colors"
@@ -204,7 +248,7 @@ const AdminDashboard = () => {
                       {item.provider}
                     </td>
                     <td className="py-3 px-4 text-sm text-muted-foreground">
-                      {item.institution}
+                      {item.institution || "—"}
                     </td>
                     <td className="py-3 px-4 text-sm text-foreground">
                       {item.stage}
@@ -219,21 +263,6 @@ const AdminDashboard = () => {
                 ))}
               </tbody>
             </table>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Quick Actions */}
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-3">
-            <Button variant="outline">Send Notifications</Button>
-            <Button variant="outline">Generate Reports</Button>
-            <Button variant="outline">Manage Users</Button>
-            <Button variant="outline">View Analytics</Button>
           </div>
         </CardContent>
       </Card>

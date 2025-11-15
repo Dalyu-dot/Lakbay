@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Search, Plus, AlertCircle, CheckCircle, Clock } from "lucide-react";
 import { Link } from "react-router-dom";
+import { toast } from "@/hooks/use-toast";
 
 // Mock data for demonstration
 const mockCases = [
@@ -40,11 +41,57 @@ const mockCases = [
 
 const ProviderDashboard = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
+  const [archivedIds, setArchivedIds] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem("archivedCaseIds");
+      return raw ? (JSON.parse(raw) as string[]) : [];
+    } catch {
+      return [];
+    }
+  });
 
-  const filteredCases = mockCases.filter((case_) =>
-    case_.patientIdentifier.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    case_.institution.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const cases = useMemo(() => {
+    const stored = localStorage.getItem("providerCases");
+    const parsed = stored ? (JSON.parse(stored) as any[]) : [];
+    return [...parsed, ...mockCases];
+  }, []);
+
+  const activeCases = cases.filter((case_) => !archivedIds.includes(case_.id));
+  const archivedCases = cases.filter((case_) => archivedIds.includes(case_.id));
+
+  const base = showArchived ? archivedCases : activeCases;
+  const filteredCases = base.filter((case_) => {
+    const term = searchTerm.toLowerCase();
+    return (
+      case_.patientIdentifier.toLowerCase().includes(term) ||
+      (case_.classification || "").toLowerCase().includes(term)
+    );
+  });
+
+  const archiveCase = (id: string) => {
+    setArchivedIds((prev) => {
+      const next = Array.from(new Set([...prev, id]));
+      localStorage.setItem("archivedCaseIds", JSON.stringify(next));
+      return next;
+    });
+    toast({
+      title: "Case archived",
+      description: "The case has been moved out of the active list.",
+    });
+  };
+
+  const unarchiveCase = (id: string) => {
+    setArchivedIds((prev) => {
+      const next = prev.filter((x) => x !== id);
+      localStorage.setItem("archivedCaseIds", JSON.stringify(next));
+      return next;
+    });
+    toast({
+      title: "Case restored",
+      description: "The case has been returned to the active list.",
+    });
+  };
 
   const getAlertBadge = (alert: string) => {
     switch (alert) {
@@ -69,51 +116,59 @@ const ProviderDashboard = () => {
   return (
     <DashboardLayout title="Provider Dashboard">
       {/* Quick Stats */}
-      <div className="grid md:grid-cols-4 gap-4 mb-8">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Cases
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-foreground">24</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Active Cases
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-primary">18</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Overdue
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-destructive">3</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Completed
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-green-600">6</div>
-          </CardContent>
-        </Card>
-      </div>
+      {(() => {
+        const totalCases = activeCases.length;
+        const activeCount = activeCases.length;
+        const overdueCount = activeCases.filter((c) => c.alert === "overdue").length;
+        const completedCount = archivedCases.length;
+        return (
+          <div className="grid md:grid-cols-4 gap-4 mb-8">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Total Cases
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-foreground">{totalCases}</div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Active Cases
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-primary">{activeCount}</div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Overdue
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-destructive">{overdueCount}</div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Completed
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-green-600">{completedCount}</div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
 
       {/* Search and Filter */}
       <Card className="mb-6">
@@ -122,7 +177,7 @@ const ProviderDashboard = () => {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
-                placeholder="Search by patient identifier or institution..."
+                placeholder={showArchived ? "Search archived by patient identifier or classification..." : "Search by patient identifier or classification..."}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -134,6 +189,9 @@ const ProviderDashboard = () => {
                 New Case
               </Button>
             </Link>
+            <Button variant="outline" onClick={() => setShowArchived((s) => !s)}>
+              {showArchived ? "Active Cases" : "Archived"}
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -141,7 +199,7 @@ const ProviderDashboard = () => {
       {/* Cases Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Patient Cases</CardTitle>
+          <CardTitle>{showArchived ? "Archived Cases" : "Patient Cases"}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -150,9 +208,6 @@ const ProviderDashboard = () => {
                 <tr className="border-b border-border">
                   <th className="text-left py-3 px-4 text-sm font-semibold text-foreground">
                     Patient ID
-                  </th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-foreground">
-                    Institution
                   </th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-foreground">
                     Current Stage
@@ -166,6 +221,9 @@ const ProviderDashboard = () => {
                   <th className="text-left py-3 px-4 text-sm font-semibold text-foreground">
                     Status
                   </th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-foreground">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -176,9 +234,6 @@ const ProviderDashboard = () => {
                   >
                     <td className="py-3 px-4 text-sm font-medium text-foreground">
                       {case_.patientIdentifier}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-muted-foreground">
-                      {case_.institution}
                     </td>
                     <td className="py-3 px-4 text-sm text-foreground">
                       {case_.currentStage}
@@ -191,6 +246,17 @@ const ProviderDashboard = () => {
                     </td>
                     <td className="py-3 px-4">
                       {getAlertBadge(case_.alert)}
+                    </td>
+                    <td className="py-3 px-4">
+                      {showArchived ? (
+                        <Button variant="outline" size="sm" onClick={() => unarchiveCase(case_.id)}>
+                          Unarchive
+                        </Button>
+                      ) : (
+                        <Button variant="outline" size="sm" onClick={() => archiveCase(case_.id)}>
+                          Archive
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 ))}

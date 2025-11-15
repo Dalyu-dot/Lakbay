@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Activity, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface DashboardLayoutProps {
@@ -29,7 +29,7 @@ const DashboardLayout = ({ children, title }: DashboardLayoutProps) => {
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-6">
             <Link to="/" className="flex items-center gap-2">
-              <Activity className="h-8 w-8 text-primary" />
+              <img src="/lungs.png" alt="LAKBAY" className="h-8 w-8" />
               <h1 className="text-2xl font-bold text-foreground">LAKBAY</h1>
             </Link>
             
@@ -57,6 +57,9 @@ const DashboardLayout = ({ children, title }: DashboardLayoutProps) => {
                   </Link>
                   <Link to="/admin/reports">
                     <Button variant="ghost">Reports</Button>
+                  </Link>
+                  <Link to="/admin/actions">
+                    <Button variant="ghost">Quick Actions</Button>
                   </Link>
                 </>
               )}

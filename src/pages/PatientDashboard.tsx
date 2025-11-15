@@ -2,6 +2,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, Circle, Clock, AlertCircle } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 // Mock patient timeline data
 const timelineStages = [
@@ -50,6 +51,8 @@ const timelineStages = [
 ];
 
 const PatientDashboard = () => {
+  const caseId = (typeof window !== "undefined" && localStorage.getItem("patientCaseId")) || "—";
+  const fullName = (typeof window !== "undefined" && localStorage.getItem("patientFullName")) || "—";
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "completed":
@@ -79,23 +82,22 @@ const PatientDashboard = () => {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Patient ID
+              Case ID
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-semibold text-foreground">JD-2025-001</div>
+            <div className="text-xl font-semibold text-foreground">{caseId}</div>
           </CardContent>
         </Card>
         
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Care Team
+              Patient Name
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-semibold text-foreground">Dr. Maria Santos</div>
-            <p className="text-sm text-muted-foreground">Metro Hospital</p>
+            <div className="text-xl font-semibold text-foreground">{fullName}</div>
           </CardContent>
         </Card>
         
@@ -171,6 +173,35 @@ const PatientDashboard = () => {
                 </div>
               </div>
             ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Static Line Chart */}
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Timeline Overview</CardTitle>
+          <CardDescription>Days elapsed across key steps</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart
+                data={[
+                  { step: "Initial Imaging", day: 0 },
+                  { step: "Referral", day: 7 },
+                  { step: "Biopsy Scheduled", day: 13 },
+                  { step: "Biopsy Performed", day: 20 },
+                ]}
+                margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="step" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} />
+                <Tooltip />
+                <Line type="monotone" dataKey="day" stroke="#2563eb" strokeWidth={2} dot />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
         </CardContent>
       </Card>
