@@ -43,6 +43,9 @@ const DashboardLayout = ({ children, title }: DashboardLayoutProps) => {
                   <Link to="/provider/cases/new">
                     <Button variant="ghost">New Case</Button>
                   </Link>
+                  <Button variant="secondary" onClick={() => toast({title: "Automated Risk Stratification", description: "Coming soon!"})}>
+                    Automated Risk Stratification
+                  </Button>
                 </>
               )}
               {userRole === "patient" && (

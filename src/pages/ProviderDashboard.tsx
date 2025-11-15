@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Search, Plus, AlertCircle, CheckCircle, Clock } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 // Mock data for demonstration
 const mockCases = [
@@ -91,6 +92,20 @@ const ProviderDashboard = () => {
       title: "Case restored",
       description: "The case has been returned to the active list.",
     });
+  };
+
+  const deleteCase = (id: string) => {
+    const stored = localStorage.getItem("providerCases");
+    const cases = stored ? (JSON.parse(stored) as any[]) : [];
+    const newCases = cases.filter((c) => c.id !== id);
+    localStorage.setItem("providerCases", JSON.stringify(newCases));
+    toast({
+      title: "Case deleted",
+      description: "This case has been permanently removed.",
+      variant: "destructive"
+    });
+    // reload
+    window.location.reload(); // simplest always-synced reload for now
   };
 
   const getAlertBadge = (alert: string) => {
@@ -249,19 +264,61 @@ const ProviderDashboard = () => {
                     </td>
                     <td className="py-3 px-4">
                       {showArchived ? (
-                        <Button variant="outline" size="sm" onClick={() => unarchiveCase(case_.id)}>
-                          Unarchive
-                        </Button>
+                        <>
+                          <Button variant="outline" size="sm" onClick={() => unarchiveCase(case_.id)}>
+                            Unarchive
+                          </Button>
+                          <Button variant="destructive" size="sm" className="ml-2" onClick={() => deleteCase(case_.id)}>
+                            Delete
+                          </Button>
+                        </>
                       ) : (
-                        <Button variant="outline" size="sm" onClick={() => archiveCase(case_.id)}>
-                          Archive
-                        </Button>
+                        <>
+                          <Button variant="outline" size="sm" onClick={() => archiveCase(case_.id)}>
+                            Archive
+                          </Button>
+                          <Button variant="destructive" size="sm" className="ml-2" onClick={() => deleteCase(case_.id)}>
+                            Delete
+                          </Button>
+                        </>
                       )}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Nodule Size Growth Chart */}
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle>Nodule Size Progression</CardTitle>
+          <CardDescription>
+            Visual representation of nodule size (mm) over time
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div style={{height:"270px"}}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart
+                data={[
+                  { day: 0, size: 8 },
+                  { day: 30, size: 8.2 },
+                  { day: 90, size: 8.6 },
+                  { day: 180, size: 9.1 },
+                  { day: 365, size: 10 },
+                ]}
+                margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="day" label={{ value: "Day", position: "insideBottomRight", offset: 0 }} />
+                <YAxis label={{ value: "Size (mm)", angle: -90, position: "insideLeft" }} />
+                <Tooltip />
+                <Line type="monotone" dataKey="size" stroke="#16a34a" strokeWidth={2} dot />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
         </CardContent>
       </Card>

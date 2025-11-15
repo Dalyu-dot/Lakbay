@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Search, Download, Users, Activity, AlertTriangle, TrendingUp } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 // Mock data (preserve for existing cases)
 const systemOverview = [
@@ -259,10 +260,55 @@ const AdminDashboard = () => {
                     <td className="py-3 px-4">
                       {getAlertBadge(item.alert)}
                     </td>
+                    <td className="py-3 px-4">
+                      {typeof item.id === "string" && (
+                        <Button variant="destructive" size="sm" onClick={() => {
+                          const stored = localStorage.getItem("providerCases");
+                          const cases = stored ? JSON.parse(stored) : [];
+                          const updated = cases.filter((c) => c.id !== item.id);
+                          localStorage.setItem("providerCases", JSON.stringify(updated));
+                          window.location.reload();
+                        }}>
+                          Delete
+                        </Button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Nodule Size Growth Chart */}
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle>Nodule Size Progression</CardTitle>
+          <CardDescription>
+            Visual representation of nodule size (mm) over time
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div style={{height:"270px"}}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart
+                data={[
+                  { day: 0, size: 8 },
+                  { day: 30, size: 8.2 },
+                  { day: 90, size: 8.6 },
+                  { day: 180, size: 9.1 },
+                  { day: 365, size: 10 },
+                ]}
+                margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="day" label={{ value: "Day", position: "insideBottomRight", offset: 0 }} />
+                <YAxis label={{ value: "Size (mm)", angle: -90, position: "insideLeft" }} />
+                <Tooltip />
+                <Line type="monotone" dataKey="size" stroke="#16a34a" strokeWidth={2} dot />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
         </CardContent>
       </Card>
