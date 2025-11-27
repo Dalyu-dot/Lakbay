@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabaseClient";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -15,28 +16,71 @@ const Auth = () => {
   const [role, setRole] = useState<string>("");
   const [fullName, setFullName] = useState("");
   const [caseNumber, setCaseNumber] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSignIn = (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate authentication
     const isPatient = role === "patient";
-    const valid =
-      (isPatient && fullName && caseNumber) ||
-      (!isPatient && email && password && role);
+    if (!role) {
+      toast({
+        title: "Error",
+        description: "Please select a role.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    if (valid) {
+    try {
+      setLoading(true);
+
+      if (isPatient) {
+        // Patient sign-in via full name + case number in Supabase `users` table
+        if (!fullName || !caseNumber) {
+          throw new Error("Please provide full name and case number.");
+        }
+
+        const { data, error } = await supabase
+          .from("users")
+          .select("*")
+          .eq("role", "patient")
+          .eq("full_name", fullName)
+          .eq("case_number", caseNumber)
+          .maybeSingle();
+
+        if (error) throw error;
+        if (!data) throw new Error("No matching patient found. Please sign up first.");
+      } else {
+        // Provider / Admin sign-in via email + password in Supabase `users` table
+        if (!email || !password) {
+          throw new Error("Please provide email and password.");
+        }
+
+        const { data, error } = await supabase
+          .from("users")
+          .select("*")
+          .eq("role", role)
+          .eq("email", email)
+          .eq("password", password)
+          .maybeSingle();
+
+        if (error) throw error;
+        if (!data) throw new Error("Invalid credentials. Please check your details or sign up.");
+      }
+
+      // Persist basic session info on the client for routing
       localStorage.setItem("userRole", role);
       if (isPatient) {
         localStorage.setItem("patientFullName", fullName);
         localStorage.setItem("patientCaseId", caseNumber);
       }
+
       toast({
         title: "Welcome back!",
-        description: "Successfully signed in.",
+        description: "Successfully signed in using the database.",
       });
-      
+
       // Navigate based on role
-      switch(role) {
+      switch (role) {
         case "provider":
           navigate("/provider");
           break;
@@ -47,35 +91,73 @@ const Auth = () => {
           navigate("/admin");
           break;
       }
-    } else {
+    } catch (err: any) {
       toast({
-        title: "Error",
-        description: "Please fill in all required fields including role selection.",
+        title: "Sign-in failed",
+        description: err.message ?? "There was a problem signing you in.",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSignUp = (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     const isPatient = role === "patient";
-    const valid =
-      (isPatient && fullName && caseNumber) ||
-      (!isPatient && email && password && role);
 
-    if (valid) {
+    if (!role) {
+      toast({
+        title: "Error",
+        description: "Please select a role.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      if (isPatient) {
+        if (!fullName || !caseNumber) {
+          throw new Error("Please provide full name and case number.");
+        }
+
+        const { error } = await supabase.from("users").insert({
+          role: "patient",
+          full_name: fullName,
+          case_number: caseNumber,
+        });
+
+        if (error) throw error;
+      } else {
+        if (!email || !password) {
+          throw new Error("Please provide email and password.");
+        }
+
+        const { error } = await supabase.from("users").insert({
+          role,
+          email,
+          password,
+          full_name: fullName || null,
+        });
+
+        if (error) throw error;
+      }
+
       localStorage.setItem("userRole", role);
       if (isPatient) {
         localStorage.setItem("patientFullName", fullName);
         localStorage.setItem("patientCaseId", caseNumber);
       }
+
       toast({
         title: "Account created!",
-        description: "Welcome to LAKBAY.",
+        description: "Your details have been saved in the database.",
       });
-      
+
       // Navigate based on role
-      switch(role) {
+      switch (role) {
         case "provider":
           navigate("/provider");
           break;
@@ -86,12 +168,14 @@ const Auth = () => {
           navigate("/admin");
           break;
       }
-    } else {
+    } catch (err: any) {
       toast({
-        title: "Error",
-        description: "Please fill in all required fields including role selection.",
+        title: "Sign-up failed",
+        description: err.message ?? "There was a problem creating your account.",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -182,8 +266,8 @@ const Auth = () => {
                     </>
                   )}
 
-                  <Button type="submit" className="w-full">
-                    Sign In
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? "Signing in..." : "Sign In"}
                   </Button>
                 </form>
               </TabsContent>
@@ -253,8 +337,8 @@ const Auth = () => {
                     </>
                   )}
 
-                  <Button type="submit" className="w-full">
-                    Create Account
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? "Creating..." : "Create Account"}
                   </Button>
                 </form>
               </TabsContent>

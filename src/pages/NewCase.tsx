@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabaseClient";
 
 const NewCase = () => {
   const navigate = useNavigate();
@@ -23,12 +24,12 @@ const NewCase = () => {
     findings: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Persist to localStorage for Provider Dashboard tracking
     const existing = localStorage.getItem("providerCases");
-    const cases = existing ? JSON.parse(existing) as any[] : [];
+    const cases = existing ? (JSON.parse(existing) as any[]) : [];
     const newCase = {
       id: `P-${String(cases.length + 1).padStart(3, "0")}`,
       patientIdentifier: formData.patientId,
@@ -55,12 +56,48 @@ const NewCase = () => {
         findings: formData.findings,
       },
     };
+
+    // Save to Supabase `cases` table for shared logging across users
+    try {
+      const { error } = await supabase.from("cases").insert({
+        id: newCase.id,
+        patient_identifier: newCase.patientIdentifier,
+        current_stage: newCase.currentStage,
+        duration: newCase.duration,
+        alert: newCase.alert,
+        classification: newCase.classification,
+        date_of_encounter: formData.dateOfEncounter,
+        physician: formData.physician,
+        symptoms: formData.symptoms,
+        imaging_date: formData.imagingDate || null,
+        imaging_type: formData.imagingType || null,
+        findings: formData.findings || null,
+      });
+
+      if (error) {
+        console.error("Supabase insert error:", error);
+        toast({
+          title: "Database warning",
+          description: "Case saved locally but not in the central database.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Case created successfully",
+          description: "The patient case has been added to the shared database.",
+        });
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast({
+        title: "Error",
+        description: "Case saved locally but not in the central database.",
+        variant: "destructive",
+      });
+    }
+
     localStorage.setItem("providerCases", JSON.stringify([newCase, ...cases]));
 
-    toast({
-      title: "Case created successfully",
-      description: "The patient case has been added to the system.",
-    });
     navigate("/provider");
   };
 

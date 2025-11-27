@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,8 +8,9 @@ import { Search, Plus, AlertCircle, CheckCircle, Clock } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { supabase } from "@/lib/supabaseClient";
 
-// Mock data for demonstration
+// Mock data for demonstration / fallback
 const mockCases = [
   {
     id: "P-001",
@@ -52,11 +53,48 @@ const ProviderDashboard = () => {
     }
   });
 
+  const [remoteCases, setRemoteCases] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchCases = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("cases")
+          .select("*")
+          .order("date_of_encounter", { ascending: false });
+
+        if (error) throw error;
+        if (data) {
+          setRemoteCases(
+            data.map((c: any) => ({
+              id: c.id,
+              patientIdentifier: c.patient_identifier,
+              institution: c.institution ?? "",
+              currentStage: c.current_stage,
+              duration: c.duration ?? 0,
+              alert: c.alert ?? "normal",
+              classification: c.classification,
+            }))
+          );
+        }
+      } catch (err) {
+        console.error("Failed to load cases from Supabase", err);
+        toast({
+          title: "Database unavailable",
+          description: "Showing local and sample cases only.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    void fetchCases();
+  }, []);
+
   const cases = useMemo(() => {
     const stored = localStorage.getItem("providerCases");
     const parsed = stored ? (JSON.parse(stored) as any[]) : [];
-    return [...parsed, ...mockCases];
-  }, []);
+    return [...remoteCases, ...parsed, ...mockCases];
+  }, [remoteCases]);
 
   const activeCases = cases.filter((case_) => !archivedIds.includes(case_.id));
   const archivedCases = cases.filter((case_) => archivedIds.includes(case_.id));
@@ -320,6 +358,31 @@ const ProviderDashboard = () => {
               </LineChart>
             </ResponsiveContainer>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Automated Risk Stratification tools */}
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle>Brock University Calculator</CardTitle>
+          <CardDescription>
+            Launch validated tools to estimate malignancy risk for solitary pulmonary nodules
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <button
+            type="button"
+            className="w-full text-left border rounded-md p-4 hover:bg-secondary/40 transition-colors"
+            onClick={() =>
+              window.open(
+                "https://www.uptodate.com/contents/calculator-solitary-pulmonary-nodule-malignancy-risk-in-adults-brock-university-cancer-prediction-equation",
+                "_blank",
+                "noopener,noreferrer"
+              )
+            }
+          >
+            <div className="font-semibold text-foreground">Brock University Calculator</div>
+          </button>
         </CardContent>
       </Card>
     </DashboardLayout>

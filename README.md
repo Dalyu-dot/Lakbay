@@ -18,7 +18,6 @@ The only requirement is having Node.js & npm installed - [install with nvm](http
 
 Follow these steps:
 
-```sh
 # Step 1: Clone the repository using the project's Git URL.
 git clone https://github.com/Dalyu-dot/Lakbay.git
 
@@ -38,13 +37,5 @@ This project is built with:
 - Vite
 - TypeScript
 - React
-- shadcn-ui
 - Tailwind CSS
-
-## How can I deploy this project?
-
-To publish, use your preferred hosting provider.
-
-## Can I connect a custom domain?
-
-Set up a custom domain with your hosting provider's documentation.
+- Supabase

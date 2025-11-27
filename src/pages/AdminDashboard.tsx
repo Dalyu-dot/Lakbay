@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -6,68 +6,42 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Search, Download, Users, Activity, AlertTriangle, TrendingUp } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-
-// Mock data (preserve for existing cases)
-const systemOverview = [
-  {
-    id: 1,
-    patientId: "JD-2025-001",
-    provider: "Dr. Maria Santos",
-    institution: "Metro Hospital",
-    stage: "Biopsy Pending",
-    duration: 12,
-    alert: "overdue",
-  },
-  {
-    id: 2,
-    patientId: "SM-2025-002",
-    provider: "Dr. John Lee",
-    institution: "City Medical Center",
-    stage: "MDC Review",
-    duration: 5,
-    alert: "normal",
-  },
-  {
-    id: 3,
-    patientId: "RB-2025-003",
-    provider: "Dr. Maria Santos",
-    institution: "Metro Hospital",
-    stage: "Imaging Follow-up",
-    duration: 20,
-    alert: "warning",
-  },
-];
-
-// Also bring in providerMockCases from before plus provider-created cases.
-const providerMockCases = [
-  {
-    id: "P-001",
-    patientIdentifier: "JD-2025-001",
-    currentStage: "Biopsy Pending",
-    duration: 12,
-    alert: "overdue",
-    classification: "Pulmonary nodule",
-  },
-  {
-    id: "P-002",
-    patientIdentifier: "SM-2025-002",
-    currentStage: "MDC Review",
-    duration: 5,
-    alert: "normal",
-    classification: "Pulmonary mass",
-  },
-  {
-    id: "P-003",
-    patientIdentifier: "RB-2025-003",
-    currentStage: "Imaging Follow-up",
-    duration: 20,
-    alert: "warning",
-    classification: "Pulmonary nodule with extrathoracic malignancy",
-  },
-];
+import { supabase } from "@/lib/supabaseClient";
 
 const AdminDashboard = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [casesFromDb, setCasesFromDb] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchCases = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("cases")
+          .select("*")
+          .order("date_of_encounter", { ascending: false });
+
+        if (error) throw error;
+
+        if (data) {
+          setCasesFromDb(
+            data.map((c: any) => ({
+              id: c.id,
+              patientId: c.patient_identifier,
+              provider: c.physician ?? "—",
+              institution: c.institution ?? "—",
+              stage: c.current_stage,
+              duration: c.duration ?? 0,
+              alert: c.alert ?? "normal",
+            }))
+          );
+        }
+      } catch (err) {
+        console.error("Failed to fetch admin cases from Supabase", err);
+      }
+    };
+
+    void fetchCases();
+  }, []);
 
   // Combine all cases for stats and overview table.
   const { totalCount, activeCount, overdueCount, completedCount, allCases } = useMemo(() => {
@@ -76,22 +50,33 @@ const AdminDashboard = () => {
       const archivedRaw = localStorage.getItem("archivedCaseIds");
       const storedCases = stored ? JSON.parse(stored) : [];
       const archivedIds = archivedRaw ? JSON.parse(archivedRaw) : [];
-      // providerMockCases and storedCases use the same structure; systemOverview is separate
-      const all = [
-        ...storedCases.map((c) => ({
-          id: c.id,
-          patientId: c.patientIdentifier,
-          provider: c.meta?.physician || "—",
-          institution: c.meta?.institution || "—",
-          stage: c.currentStage,
-          duration: c.duration,
-          alert: c.alert,
-        })),
-        // Optionally include systemOverview (comment out if you only want live/tracked cases):
-        ...systemOverview,
-      ];
+      
+      // Map casesFromDb to the expected format
+      const dbCases = casesFromDb.map((c) => ({
+        id: c.id,
+        patientId: c.patientId,
+        provider: c.provider,
+        institution: c.institution,
+        stage: c.stage,
+        duration: c.duration,
+        alert: c.alert,
+      }));
+      
+      // Map localStorage cases
+      const localCases = storedCases.map((c: any) => ({
+        id: c.id,
+        patientId: c.patientIdentifier,
+        provider: c.meta?.physician || "—",
+        institution: c.meta?.institution || "—",
+        stage: c.currentStage,
+        duration: c.duration,
+        alert: c.alert,
+      }));
+      
+      const all = [...dbCases, ...localCases];
       const active = all.filter((c) => !archivedIds.includes(c.id));
       const archived = all.filter((c) => archivedIds.includes(c.id));
+      
       return {
         totalCount: active.length,
         activeCount: active.length,
@@ -99,10 +84,11 @@ const AdminDashboard = () => {
         completedCount: archived.length,
         allCases: active,
       };
-    } catch {
+    } catch (err) {
+      console.error("Error processing cases:", err);
       return { totalCount: 0, activeCount: 0, overdueCount: 0, completedCount: 0, allCases: [] };
     }
-  }, []);
+  }, [casesFromDb]);
 
   const filteredData = allCases.filter((item) => {
     // Allow for missing provider data for new cases

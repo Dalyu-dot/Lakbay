@@ -1,7 +1,7 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, FileText, BarChart3 } from "lucide-react";
+import { Download, FileText } from "lucide-react";
 
 const AdminReports = () => {
   return (
@@ -44,38 +44,6 @@ const AdminReports = () => {
                   <Button className="w-full">
                     <Download className="h-4 w-4 mr-2" />
                     Export to Excel
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card className="border-2">
-                <CardHeader>
-                  <BarChart3 className="h-8 w-8 text-primary mb-2" />
-                  <CardTitle className="text-lg">Timeline Analysis</CardTitle>
-                  <CardDescription>
-                    Gantt charts and timeline data for all cases
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button className="w-full">
-                    <Download className="h-4 w-4 mr-2" />
-                    Export Charts
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card className="border-2">
-                <CardHeader>
-                  <BarChart3 className="h-8 w-8 text-primary mb-2" />
-                  <CardTitle className="text-lg">KPI Summary</CardTitle>
-                  <CardDescription>
-                    Key performance indicators and statistics
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button className="w-full">
-                    <Download className="h-4 w-4 mr-2" />
-                    Export Summary
                   </Button>
                 </CardContent>
               </Card>
