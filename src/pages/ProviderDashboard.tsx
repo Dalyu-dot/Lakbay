@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,38 +11,8 @@ import { toast } from "@/hooks/use-toast";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { supabase } from "@/lib/supabaseClient";
 
-// Mock data for demonstration / fallback
-const mockCases = [
-  {
-    id: "P-001",
-    patientIdentifier: "JD-2025-001",
-    institution: "Metro Hospital",
-    currentStage: "Biopsy Pending",
-    duration: 12,
-    alert: "overdue",
-    classification: "Pulmonary nodule",
-  },
-  {
-    id: "P-002",
-    patientIdentifier: "SM-2025-002",
-    institution: "City Medical Center",
-    currentStage: "MDC Review",
-    duration: 5,
-    alert: "normal",
-    classification: "Pulmonary mass",
-  },
-  {
-    id: "P-003",
-    patientIdentifier: "RB-2025-003",
-    institution: "Metro Hospital",
-    currentStage: "Imaging Follow-up",
-    duration: 20,
-    alert: "warning",
-    classification: "Pulmonary nodule with extrathoracic malignancy",
-  },
-];
-
 const ProviderDashboard = () => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [archivedIds, setArchivedIds] = useState<string[]>(() => {
@@ -53,7 +24,8 @@ const ProviderDashboard = () => {
     }
   });
 
-  const [remoteCases, setRemoteCases] = useState<any[]>([]);
+  const [cases, setCases] = useState<any[]>([]);
+  const [uniquePatients, setUniquePatients] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchCases = async () => {
@@ -65,23 +37,30 @@ const ProviderDashboard = () => {
 
         if (error) throw error;
         if (data) {
-          setRemoteCases(
-            data.map((c: any) => ({
-              id: c.id,
-              patientIdentifier: c.patient_identifier,
-              institution: c.institution ?? "",
-              currentStage: c.current_stage,
-              duration: c.duration ?? 0,
-              alert: c.alert ?? "normal",
-              classification: c.classification,
-            }))
-          );
+          const mappedCases = data.map((c: any) => ({
+            id: c.id,
+            patientIdentifier: c.patient_identifier,
+            institution: c.institution ?? "",
+            currentStage: c.current_stage,
+            duration: c.duration ?? 0,
+            alert: c.alert ?? "normal",
+            classification: c.classification,
+            completion_reason: c.completion_reason,
+            completion_date: c.completion_date,
+          }));
+          setCases(mappedCases);
+          
+          // Get unique patient identifiers
+          const patients = Array.from(
+            new Set(mappedCases.map((c) => c.patientIdentifier).filter(Boolean))
+          ).sort();
+          setUniquePatients(patients);
         }
       } catch (err) {
         console.error("Failed to load cases from Supabase", err);
         toast({
           title: "Database unavailable",
-          description: "Showing local and sample cases only.",
+          description: "Failed to load cases from database.",
           variant: "destructive",
         });
       }
@@ -90,16 +69,22 @@ const ProviderDashboard = () => {
     void fetchCases();
   }, []);
 
-  const cases = useMemo(() => {
-    const stored = localStorage.getItem("providerCases");
-    const parsed = stored ? (JSON.parse(stored) as any[]) : [];
-    return [...remoteCases, ...parsed, ...mockCases];
-  }, [remoteCases]);
+  // Check if case is completed based on stage or completion_reason
+  const isCaseCompleted = (case_: any) => {
+    return case_.currentStage?.startsWith("Completed") || 
+           case_.completion_reason ||
+           case_.completion_date;
+  };
 
-  const activeCases = cases.filter((case_) => !archivedIds.includes(case_.id));
-  const archivedCases = cases.filter((case_) => archivedIds.includes(case_.id));
+  const activeCases = cases.filter((case_) => 
+    !archivedIds.includes(case_.id) && !isCaseCompleted(case_)
+  );
+  const completedCases = cases.filter((case_) => isCaseCompleted(case_));
+  const archivedCases = cases.filter((case_) => 
+    archivedIds.includes(case_.id) && !isCaseCompleted(case_)
+  );
 
-  const base = showArchived ? archivedCases : activeCases;
+  const base = showArchived ? [...archivedCases, ...completedCases] : activeCases;
   const filteredCases = base.filter((case_) => {
     const term = searchTerm.toLowerCase();
     return (
@@ -132,18 +117,41 @@ const ProviderDashboard = () => {
     });
   };
 
-  const deleteCase = (id: string) => {
-    const stored = localStorage.getItem("providerCases");
-    const cases = stored ? (JSON.parse(stored) as any[]) : [];
-    const newCases = cases.filter((c) => c.id !== id);
-    localStorage.setItem("providerCases", JSON.stringify(newCases));
-    toast({
-      title: "Case deleted",
-      description: "This case has been permanently removed.",
-      variant: "destructive"
-    });
-    // reload
-    window.location.reload(); // simplest always-synced reload for now
+  const deleteCase = async (id: string) => {
+    try {
+      const { error } = await supabase.from("cases").delete().eq("id", id);
+      if (error) throw error;
+      
+      toast({
+        title: "Case deleted",
+        description: "This case has been permanently removed.",
+        variant: "destructive"
+      });
+      
+      // Refresh cases
+      const { data } = await supabase
+        .from("cases")
+        .select("*")
+        .order("date_of_encounter", { ascending: false });
+      if (data) {
+        const mappedCases = data.map((c: any) => ({
+          id: c.id,
+          patientIdentifier: c.patient_identifier,
+          institution: c.institution ?? "",
+          currentStage: c.current_stage,
+          duration: c.duration ?? 0,
+          alert: c.alert ?? "normal",
+          classification: c.classification,
+        }));
+        setCases(mappedCases);
+      }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to delete case.",
+        variant: "destructive"
+      });
+    }
   };
 
   const getAlertBadge = (alert: string) => {
@@ -170,10 +178,10 @@ const ProviderDashboard = () => {
     <DashboardLayout title="Provider Dashboard">
       {/* Quick Stats */}
       {(() => {
-        const totalCases = activeCases.length;
+        const totalCases = activeCases.length + completedCases.length;
         const activeCount = activeCases.length;
         const overdueCount = activeCases.filter((c) => c.alert === "overdue").length;
-        const completedCount = archivedCases.length;
+        const completedCount = completedCases.length;
         return (
           <div className="grid md:grid-cols-4 gap-4 mb-8">
             <Card>
@@ -243,8 +251,33 @@ const ProviderDashboard = () => {
               </Button>
             </Link>
             <Button variant="outline" onClick={() => setShowArchived((s) => !s)}>
-              {showArchived ? "Active Cases" : "Archived"}
+              {showArchived ? "Active Cases" : "Completed Cases"}
             </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Patients List */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>All Patients</CardTitle>
+          <CardDescription>Click on a patient to view and edit all their cases</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            {uniquePatients.map((patientId) => (
+              <Button
+                key={patientId}
+                variant="outline"
+                onClick={() => navigate(`/provider/patient/${patientId}`)}
+                className="justify-start"
+              >
+                {patientId}
+              </Button>
+            ))}
+            {uniquePatients.length === 0 && (
+              <p className="text-muted-foreground col-span-full">No patients found.</p>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -252,7 +285,7 @@ const ProviderDashboard = () => {
       {/* Cases Table */}
       <Card>
         <CardHeader>
-          <CardTitle>{showArchived ? "Archived Cases" : "Patient Cases"}</CardTitle>
+          <CardTitle>{showArchived ? "Completed Cases" : "Active Cases"}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -283,10 +316,15 @@ const ProviderDashboard = () => {
                 {filteredCases.map((case_) => (
                   <tr
                     key={case_.id}
-                    className="border-b border-border hover:bg-secondary/30 transition-colors cursor-pointer"
+                    className="border-b border-border hover:bg-secondary/30 transition-colors"
                   >
                     <td className="py-3 px-4 text-sm font-medium text-foreground">
-                      {case_.patientIdentifier}
+                      <button
+                        onClick={() => navigate(`/provider/patient/${case_.patientIdentifier}`)}
+                        className="text-primary hover:underline cursor-pointer"
+                      >
+                        {case_.patientIdentifier}
+                      </button>
                     </td>
                     <td className="py-3 px-4 text-sm text-foreground">
                       {case_.currentStage}
@@ -303,10 +341,7 @@ const ProviderDashboard = () => {
                     <td className="py-3 px-4">
                       {showArchived ? (
                         <>
-                          <Button variant="outline" size="sm" onClick={() => unarchiveCase(case_.id)}>
-                            Unarchive
-                          </Button>
-                          <Button variant="destructive" size="sm" className="ml-2" onClick={() => deleteCase(case_.id)}>
+                          <Button variant="destructive" size="sm" onClick={() => deleteCase(case_.id)}>
                             Delete
                           </Button>
                         </>

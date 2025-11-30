@@ -11,6 +11,8 @@ import NewCase from "./pages/NewCase";
 import AdminReports from "./pages/AdminReports";
 import NotFound from "./pages/NotFound";
 import AdminQuickActions from "./pages/AdminQuickActions";
+import PatientDetail from "./pages/PatientDetail";
+import AdminUserManagement from "./pages/AdminUserManagement";
 
 const queryClient = new QueryClient();
 
@@ -25,10 +27,12 @@ const App = () => (
           <Route path="/auth" element={<Auth />} />
           <Route path="/provider" element={<ProviderDashboard />} />
           <Route path="/provider/cases/new" element={<NewCase />} />
+          <Route path="/provider/patient/:patientId" element={<PatientDetail />} />
           <Route path="/patient" element={<PatientDashboard />} />
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/reports" element={<AdminReports />} />
           <Route path="/admin/actions" element={<AdminQuickActions />} />
+          <Route path="/admin/users" element={<AdminUserManagement />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

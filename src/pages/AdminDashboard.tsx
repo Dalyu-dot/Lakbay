@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Search, Download, Users, Activity, AlertTriangle, TrendingUp } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { supabase } from "@/lib/supabaseClient";
+import { toast } from "@/hooks/use-toast";
 
 const AdminDashboard = () => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [casesFromDb, setCasesFromDb] = useState<any[]>([]);
 
@@ -32,6 +34,8 @@ const AdminDashboard = () => {
               stage: c.current_stage,
               duration: c.duration ?? 0,
               alert: c.alert ?? "normal",
+              completion_reason: c.completion_reason,
+              completion_date: c.completion_date,
             }))
           );
         }
@@ -43,14 +47,16 @@ const AdminDashboard = () => {
     void fetchCases();
   }, []);
 
-  // Combine all cases for stats and overview table.
+  // Check if case is completed
+  const isCaseCompleted = (c: any) => {
+    return c.stage?.startsWith("Completed") || 
+           c.completion_reason ||
+           c.completion_date;
+  };
+
+  // Process cases from database only (no mock data, no localStorage)
   const { totalCount, activeCount, overdueCount, completedCount, allCases } = useMemo(() => {
     try {
-      const stored = localStorage.getItem("providerCases");
-      const archivedRaw = localStorage.getItem("archivedCaseIds");
-      const storedCases = stored ? JSON.parse(stored) : [];
-      const archivedIds = archivedRaw ? JSON.parse(archivedRaw) : [];
-      
       // Map casesFromDb to the expected format
       const dbCases = casesFromDb.map((c) => ({
         id: c.id,
@@ -60,29 +66,19 @@ const AdminDashboard = () => {
         stage: c.stage,
         duration: c.duration,
         alert: c.alert,
+        completion_reason: c.completion_reason,
+        completion_date: c.completion_date,
       }));
       
-      // Map localStorage cases
-      const localCases = storedCases.map((c: any) => ({
-        id: c.id,
-        patientId: c.patientIdentifier,
-        provider: c.meta?.physician || "—",
-        institution: c.meta?.institution || "—",
-        stage: c.currentStage,
-        duration: c.duration,
-        alert: c.alert,
-      }));
-      
-      const all = [...dbCases, ...localCases];
-      const active = all.filter((c) => !archivedIds.includes(c.id));
-      const archived = all.filter((c) => archivedIds.includes(c.id));
+      const active = dbCases.filter((c) => !isCaseCompleted(c));
+      const completed = dbCases.filter((c) => isCaseCompleted(c));
       
       return {
-        totalCount: active.length,
+        totalCount: active.length + completed.length,
         activeCount: active.length,
         overdueCount: active.filter((c) => c.alert === "overdue").length,
-        completedCount: archived.length,
-        allCases: active,
+        completedCount: completed.length,
+        allCases: active, // Show only active cases in the main view
       };
     } catch (err) {
       console.error("Error processing cases:", err);
@@ -182,7 +178,59 @@ const AdminDashboard = () => {
                 className="pl-10"
               />
             </div>
-            <Button variant="outline">
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (allCases.length === 0) {
+                  toast({
+                    title: "No data",
+                    description: "No cases to export.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+
+                const headers = [
+                  "Case ID",
+                  "Patient ID",
+                  "Provider",
+                  "Institution",
+                  "Current Stage",
+                  "Duration (days)",
+                  "Alert Status",
+                ];
+
+                const rows = allCases.map((c) => [
+                  c.id,
+                  c.patientId,
+                  c.provider,
+                  c.institution,
+                  c.stage,
+                  c.duration,
+                  c.alert,
+                ]);
+
+                const csvContent = [
+                  headers.join(","),
+                  ...rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")),
+                ].join("\n");
+
+                const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+                const link = document.createElement("a");
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", `admin_cases_export_${new Date().toISOString().split("T")[0]}.csv`);
+                link.style.visibility = "hidden";
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                toast({
+                  title: "Export successful",
+                  description: "Cases have been exported to CSV.",
+                });
+              }}
+            >
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
@@ -226,10 +274,19 @@ const AdminDashboard = () => {
                 {filteredData.map(item => (
                   <tr
                     key={item.id}
-                    className="border-b border-border hover:bg-secondary/30 transition-colors"
+                    className="border-b border-border hover:bg-secondary/30 transition-colors cursor-pointer"
+                    onClick={() => navigate(`/provider/patient/${item.patientId}`)}
                   >
                     <td className="py-3 px-4 text-sm font-medium text-foreground">
-                      {item.patientId}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/provider/patient/${item.patientId}`);
+                        }}
+                        className="text-primary hover:underline"
+                      >
+                        {item.patientId}
+                      </button>
                     </td>
                     <td className="py-3 px-4 text-sm text-muted-foreground">
                       {item.provider}
@@ -246,19 +303,6 @@ const AdminDashboard = () => {
                     <td className="py-3 px-4">
                       {getAlertBadge(item.alert)}
                     </td>
-                    <td className="py-3 px-4">
-                      {typeof item.id === "string" && (
-                        <Button variant="destructive" size="sm" onClick={() => {
-                          const stored = localStorage.getItem("providerCases");
-                          const cases = stored ? JSON.parse(stored) : [];
-                          const updated = cases.filter((c) => c.id !== item.id);
-                          localStorage.setItem("providerCases", JSON.stringify(updated));
-                          window.location.reload();
-                        }}>
-                          Delete
-                        </Button>
-                      )}
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -267,37 +311,6 @@ const AdminDashboard = () => {
         </CardContent>
       </Card>
 
-      {/* Nodule Size Growth Chart */}
-      <Card className="mt-8">
-        <CardHeader>
-          <CardTitle>Nodule Size Progression</CardTitle>
-          <CardDescription>
-            Visual representation of nodule size (mm) over time
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div style={{height:"270px"}}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                data={[
-                  { day: 0, size: 8 },
-                  { day: 30, size: 8.2 },
-                  { day: 90, size: 8.6 },
-                  { day: 180, size: 9.1 },
-                  { day: 365, size: 10 },
-                ]}
-                margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="day" label={{ value: "Day", position: "insideBottomRight", offset: 0 }} />
-                <YAxis label={{ value: "Size (mm)", angle: -90, position: "insideLeft" }} />
-                <Tooltip />
-                <Line type="monotone" dataKey="size" stroke="#16a34a" strokeWidth={2} dot />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
     </DashboardLayout>
   );
 };

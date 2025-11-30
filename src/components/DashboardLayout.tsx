@@ -55,6 +55,9 @@ const DashboardLayout = ({ children, title }: DashboardLayoutProps) => {
                   <Link to="/admin">
                     <Button variant="ghost">Overview</Button>
                   </Link>
+                  <Link to="/admin/users">
+                    <Button variant="ghost">User Management</Button>
+                  </Link>
                   <Link to="/admin/reports">
                     <Button variant="ghost">Reports</Button>
                   </Link>
