@@ -26,6 +26,7 @@ const ProviderDashboard = () => {
 
   const [cases, setCases] = useState<any[]>([]);
   const [uniquePatients, setUniquePatients] = useState<string[]>([]);
+  const [hasNotified, setHasNotified] = useState(false);
 
   useEffect(() => {
     const fetchCases = async () => {
@@ -47,6 +48,7 @@ const ProviderDashboard = () => {
             classification: c.classification,
             completion_reason: c.completion_reason,
             completion_date: c.completion_date,
+            date_of_encounter: c.date_of_encounter,
           }));
           setCases(mappedCases);
           
@@ -55,6 +57,44 @@ const ProviderDashboard = () => {
             new Set(mappedCases.map((c) => c.patientIdentifier).filter(Boolean))
           ).sort();
           setUniquePatients(patients);
+
+          // Check for overdue cases and show notifications (only once per load)
+          if (!hasNotified) {
+            const activeCases = mappedCases.filter((c: any) => 
+              !archivedIds.includes(c.id) && 
+              !(c.currentStage?.startsWith("Completed") || c.completion_reason || c.completion_date)
+            );
+            
+            const overdueCases = activeCases.filter((c: any) => c.alert === "overdue");
+            
+            if (overdueCases.length > 0) {
+              // Show individual notifications for each overdue case (limit to 3 to avoid spam)
+              overdueCases.slice(0, 3).forEach((case_: any, index: number) => {
+                setTimeout(() => {
+                  toast({
+                    title: "⚠️ Overdue Case Alert",
+                    description: `Case for patient ${case_.patientIdentifier} is overdue and requires attention.`,
+                    variant: "destructive",
+                    duration: 8000,
+                  });
+                }, index * 500);
+              });
+
+              // If there are more than 3, show a summary
+              if (overdueCases.length > 3) {
+                setTimeout(() => {
+                  toast({
+                    title: "Multiple Overdue Cases",
+                    description: `You have ${overdueCases.length} overdue case(s) that need attention. Please review your dashboard.`,
+                    variant: "destructive",
+                    duration: 6000,
+                  });
+                }, 2000);
+              }
+              
+              setHasNotified(true);
+            }
+          }
         }
       } catch (err) {
         console.error("Failed to load cases from Supabase", err);
@@ -67,7 +107,7 @@ const ProviderDashboard = () => {
     };
 
     void fetchCases();
-  }, []);
+  }, [archivedIds, hasNotified]);
 
   // Check if case is completed based on stage or completion_reason
   const isCaseCompleted = (case_: any) => {

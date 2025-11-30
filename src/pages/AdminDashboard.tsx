@@ -13,6 +13,7 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [casesFromDb, setCasesFromDb] = useState<any[]>([]);
+  const [hasNotified, setHasNotified] = useState(false);
 
   useEffect(() => {
     const fetchCases = async () => {
@@ -25,19 +26,57 @@ const AdminDashboard = () => {
         if (error) throw error;
 
         if (data) {
-          setCasesFromDb(
-            data.map((c: any) => ({
-              id: c.id,
-              patientId: c.patient_identifier,
-              provider: c.physician ?? "—",
-              institution: c.institution ?? "—",
-              stage: c.current_stage,
-              duration: c.duration ?? 0,
-              alert: c.alert ?? "normal",
-              completion_reason: c.completion_reason,
-              completion_date: c.completion_date,
-            }))
-          );
+          const mappedCases = data.map((c: any) => ({
+            id: c.id,
+            patientId: c.patient_identifier,
+            provider: c.physician ?? "—",
+            institution: c.institution ?? "—",
+            stage: c.current_stage,
+            duration: c.duration ?? 0,
+            alert: c.alert ?? "normal",
+            completion_reason: c.completion_reason,
+            completion_date: c.completion_date,
+            date_of_encounter: c.date_of_encounter,
+          }));
+          
+          setCasesFromDb(mappedCases);
+
+          // Check for overdue cases and show notifications (only once per load)
+          if (!hasNotified) {
+            const activeCases = mappedCases.filter((c: any) => 
+              !(c.stage?.startsWith("Completed") || c.completion_reason || c.completion_date)
+            );
+            
+            const overdueCases = activeCases.filter((c: any) => c.alert === "overdue");
+            
+            if (overdueCases.length > 0) {
+              // Show individual notifications for each overdue case (limit to 3 to avoid spam)
+              overdueCases.slice(0, 3).forEach((case_: any, index: number) => {
+                setTimeout(() => {
+                  toast({
+                    title: "⚠️ Overdue Case Alert",
+                    description: `Case for patient ${case_.patientId} (Provider: ${case_.provider}) is overdue and requires attention.`,
+                    variant: "destructive",
+                    duration: 8000,
+                  });
+                }, index * 500);
+              });
+
+              // If there are more than 3, show a summary
+              if (overdueCases.length > 3) {
+                setTimeout(() => {
+                  toast({
+                    title: "Multiple Overdue Cases",
+                    description: `There are ${overdueCases.length} overdue case(s) in the system that need attention. Please review the dashboard.`,
+                    variant: "destructive",
+                    duration: 6000,
+                  });
+                }, 2000);
+              }
+              
+              setHasNotified(true);
+            }
+          }
         }
       } catch (err) {
         console.error("Failed to fetch admin cases from Supabase", err);
@@ -45,7 +84,7 @@ const AdminDashboard = () => {
     };
 
     void fetchCases();
-  }, []);
+  }, [hasNotified]);
 
   // Check if case is completed
   const isCaseCompleted = (c: any) => {

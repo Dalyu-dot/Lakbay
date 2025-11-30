@@ -19,6 +19,7 @@ const Auth = () => {
   const [role, setRole] = useState<string>("");
   const [fullName, setFullName] = useState("");
   const [caseNumber, setCaseNumber] = useState("");
+  const [patientPassword, setPatientPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   // Ensure superuser exists on component mount
@@ -101,23 +102,34 @@ const Auth = () => {
 
     try {
       setLoading(true);
+      let data: any = null;
 
       if (isPatient) {
-        // Patient sign-in via full name + case number in Supabase `users` table
-        if (!fullName || !caseNumber) {
-          throw new Error("Please provide full name and case number.");
+        // Patient sign-in via full name (case-insensitive) + password in Supabase `users` table
+        if (!fullName || !patientPassword) {
+          throw new Error("Please provide full name and password.");
         }
 
-        const { data, error } = await supabase
+        // Case-insensitive search for patient by name
+        const { data: allPatients, error: fetchError } = await supabase
           .from("users")
           .select("*")
-          .eq("role", "patient")
-          .eq("full_name", fullName)
-          .eq("case_number", caseNumber)
-          .maybeSingle();
+          .eq("role", "patient");
 
-        if (error) throw error;
-        if (!data) throw new Error("No matching patient found. Please sign up first.");
+        if (fetchError) throw fetchError;
+        
+        // Find patient with case-insensitive name match and password match
+        const patient = allPatients?.find(
+          (p: any) => 
+            p.full_name?.toLowerCase().trim() === fullName.toLowerCase().trim() &&
+            p.password === patientPassword
+        );
+
+        if (!patient) {
+          throw new Error("Invalid credentials. Please check your name and password.");
+        }
+        
+        data = patient;
         
         // Check if user is approved (if approved column exists)
         if (data.approved === false) {
@@ -184,7 +196,7 @@ const Auth = () => {
         }
 
         // Regular user login
-        const { data, error } = await supabase
+        const { data: userData, error } = await supabase
           .from("users")
           .select("*")
           .eq("role", role)
@@ -193,7 +205,9 @@ const Auth = () => {
           .maybeSingle();
 
         if (error) throw error;
-        if (!data) throw new Error("Invalid credentials. Please check your details or sign up.");
+        if (!userData) throw new Error("Invalid credentials. Please check your details or sign up.");
+        
+        data = userData;
         
         // Check if user is approved (if approved column exists)
         if (data.approved === false) {
@@ -204,8 +218,8 @@ const Auth = () => {
       // Persist basic session info on the client for routing
       localStorage.setItem("userRole", role);
       if (isPatient) {
-        localStorage.setItem("patientFullName", fullName);
-        localStorage.setItem("patientCaseId", caseNumber);
+        localStorage.setItem("patientFullName", data.full_name);
+        localStorage.setItem("patientCaseId", data.case_number || "");
       }
 
       toast({
@@ -253,15 +267,31 @@ const Auth = () => {
       setLoading(true);
 
       if (isPatient) {
-        if (!fullName || !caseNumber) {
-          throw new Error("Please provide full name and case number.");
+        if (!fullName || !patientPassword) {
+          throw new Error("Please provide full name and password.");
+        }
+
+        // Check if patient with same name already exists (case-insensitive)
+        const { data: existingPatients, error: checkError } = await supabase
+          .from("users")
+          .select("full_name")
+          .eq("role", "patient");
+
+        if (checkError) throw checkError;
+
+        const nameExists = existingPatients?.some(
+          (p: any) => p.full_name?.toLowerCase().trim() === fullName.toLowerCase().trim()
+        );
+
+        if (nameExists) {
+          throw new Error("A patient with this name already exists. Please sign in instead.");
         }
 
         const { error } = await supabase.from("users").insert({
           role: "patient",
-          full_name: fullName,
-          case_number: caseNumber,
-          approved: false, // Pending approval
+          full_name: fullName.trim(),
+          password: patientPassword,
+          approved: false, // Pending approval - provider will assign case number
         });
 
         if (error) throw error;
@@ -292,6 +322,7 @@ const Auth = () => {
       setPassword("");
       setFullName("");
       setCaseNumber("");
+      setPatientPassword("");
       setRole("");
     } catch (err: any) {
       toast({
@@ -355,12 +386,13 @@ const Auth = () => {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="signin-casenumber">Case Number</Label>
+                        <Label htmlFor="signin-password">Password</Label>
                         <Input
-                          id="signin-casenumber"
-                          placeholder="Case number"
-                          value={caseNumber}
-                          onChange={(e) => setCaseNumber(e.target.value)}
+                          id="signin-password"
+                          type="password"
+                          placeholder="Enter your password"
+                          value={patientPassword}
+                          onChange={(e) => setPatientPassword(e.target.value)}
                           required
                         />
                       </div>
@@ -416,7 +448,7 @@ const Auth = () => {
                   {role === "patient" ? (
                     <>
                       <div className="space-y-2">
-                        <Label htmlFor="signup-fullname">Full Name</Label>
+                        <Label htmlFor="signup-fullname">Full Name (as provided by your provider)</Label>
                         <Input
                           id="signup-fullname"
                           placeholder="e.g., Juan Dela Cruz"
@@ -424,14 +456,18 @@ const Auth = () => {
                           onChange={(e) => setFullName(e.target.value)}
                           required
                         />
+                        <p className="text-xs text-muted-foreground">
+                          Use the exact name as provided by your healthcare provider
+                        </p>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="signup-casenumber">Case Number</Label>
+                        <Label htmlFor="signup-password">Password</Label>
                         <Input
-                          id="signup-casenumber"
-                          placeholder="Case number"
-                          value={caseNumber}
-                          onChange={(e) => setCaseNumber(e.target.value)}
+                          id="signup-password"
+                          type="password"
+                          placeholder="Create a password"
+                          value={patientPassword}
+                          onChange={(e) => setPatientPassword(e.target.value)}
                           required
                         />
                       </div>

@@ -26,6 +26,8 @@ const NewCase = () => {
   const [existingPatients, setExistingPatients] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedPatientOption, setSelectedPatientOption] = useState<string>("");
+  const [patientSearchTerm, setPatientSearchTerm] = useState<string>("");
+  const [showPatientDropdown, setShowPatientDropdown] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchPatients = async () => {
@@ -86,6 +88,13 @@ const NewCase = () => {
 
     // Save to Supabase `cases` table
     try {
+      // Initialize physician history with the first physician
+      const physicianHistory = formData.physician ? [{
+        physician: formData.physician,
+        start_date: formData.dateOfEncounter,
+        end_date: null,
+      }] : [];
+
       const { error } = await supabase.from("cases").insert({
         id: caseId,
         patient_identifier: formData.patientId,
@@ -95,6 +104,7 @@ const NewCase = () => {
         classification: classification,
         date_of_encounter: formData.dateOfEncounter,
         physician: formData.physician,
+        physician_history: JSON.stringify(physicianHistory),
         symptoms: formData.symptoms || null,
         imaging_date: formData.imagingDate || null,
         imaging_type: formData.imagingType || null,
@@ -133,6 +143,27 @@ const NewCase = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  // Filter patients based on search term
+  const filteredPatients = existingPatients.filter((patientId) =>
+    patientId.toLowerCase().includes(patientSearchTerm.toLowerCase())
+  );
+
+  const handlePatientSelect = (patientId: string) => {
+    setFormData(prev => ({ ...prev, patientId }));
+    setPatientSearchTerm(patientId);
+    setSelectedPatientOption(patientId);
+    setShowPatientDropdown(false);
+  };
+
+  const handlePatientInputChange = (value: string) => {
+    setPatientSearchTerm(value);
+    setShowPatientDropdown(true);
+    if (value === "") {
+      setSelectedPatientOption("");
+      handleChange("patientId", "");
+    }
+  };
+
   return (
     <DashboardLayout title="New Patient Case">
       <form onSubmit={handleSubmit}>
@@ -145,44 +176,49 @@ const NewCase = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-2">
+                <div className="space-y-2 relative">
                   <Label htmlFor="patientId">Patient (Case ID) *</Label>
-                  <Select
-                    value={selectedPatientOption}
-                    onValueChange={(value) => {
-                      setSelectedPatientOption(value);
-                      if (value !== "new") {
-                        handleChange("patientId", value);
-                      } else {
-                        handleChange("patientId", "");
-                      }
-                    }}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select patient or create new case" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="new">New Case</SelectItem>
-                      {existingPatients.map((patientId) => (
-                        <SelectItem key={patientId} value={patientId}>
-                          {patientId}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {(selectedPatientOption === "new" || selectedPatientOption === "") && (
+                  <div className="relative">
                     <Input
                       id="patientId"
-                      placeholder="Enter new Case ID (e.g., JD-2025-001)"
-                      value={formData.patientId}
-                      onChange={(e) => handleChange("patientId", e.target.value)}
+                      placeholder="Search or enter new Case ID (e.g., JD-2025-001)"
+                      value={patientSearchTerm}
+                      onChange={(e) => {
+                        handlePatientInputChange(e.target.value);
+                        handleChange("patientId", e.target.value);
+                      }}
+                      onFocus={() => setShowPatientDropdown(true)}
+                      onBlur={() => {
+                        // Delay to allow click on dropdown item
+                        setTimeout(() => setShowPatientDropdown(false), 200);
+                      }}
                       required
                     />
-                  )}
-                  {selectedPatientOption !== "new" && selectedPatientOption !== "" && (
+                    {showPatientDropdown && patientSearchTerm && filteredPatients.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-60 overflow-auto">
+                        {filteredPatients.slice(0, 10).map((patientId) => (
+                          <div
+                            key={patientId}
+                            className="px-4 py-2 cursor-pointer hover:bg-accent hover:text-accent-foreground text-sm"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              handlePatientSelect(patientId);
+                            }}
+                          >
+                            {patientId}
+                          </div>
+                        ))}
+                        {filteredPatients.length > 10 && (
+                          <div className="px-4 py-2 text-xs text-muted-foreground border-t">
+                            {filteredPatients.length - 10} more results...
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {patientSearchTerm && filteredPatients.length === 0 && existingPatients.length > 0 && (
                     <p className="text-xs text-muted-foreground">
-                      Selected: {formData.patientId}
+                      No matching patients found. This will create a new case.
                     </p>
                   )}
                 </div>

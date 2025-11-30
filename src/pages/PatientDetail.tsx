@@ -65,6 +65,19 @@ const PatientDetail = () => {
     });
   };
 
+  // Parse physician history from JSON string or array
+  const getPhysicianHistory = (caseItem: any) => {
+    if (!caseItem.physician_history) return [];
+    try {
+      if (typeof caseItem.physician_history === 'string') {
+        return JSON.parse(caseItem.physician_history);
+      }
+      return caseItem.physician_history;
+    } catch {
+      return [];
+    }
+  };
+
   const handleCompleteCase = (caseItem: any) => {
     setCompletingCaseId(caseItem.id);
     setCompletionReason("");
@@ -143,6 +156,7 @@ const PatientDetail = () => {
 
   const handleSave = async (caseId: string) => {
     try {
+      const caseItem = cases.find(c => c.id === caseId);
       const updateData: any = {
         current_stage: editForm.current_stage,
         alert: editForm.alert,
@@ -151,9 +165,42 @@ const PatientDetail = () => {
         findings: editForm.findings,
       };
 
-      // Admin can reassign provider
+      // Admin can reassign provider - track history
       if (isAdmin && editForm.physician) {
-        updateData.physician = editForm.physician;
+        const currentPhysician = caseItem?.physician || "";
+        const newPhysician = editForm.physician.trim();
+        
+        // If physician changed, add to history
+        if (currentPhysician && currentPhysician !== newPhysician) {
+          const history = getPhysicianHistory(caseItem);
+          const today = new Date().toISOString().split("T")[0];
+          
+          // Add current physician to history if not already there or if different
+          const existingEntry = history.find((h: any) => 
+            h.physician === currentPhysician && h.end_date === null
+          );
+          
+          if (existingEntry) {
+            existingEntry.end_date = today;
+          } else if (currentPhysician) {
+            history.push({
+              physician: currentPhysician,
+              start_date: caseItem.date_of_encounter || today,
+              end_date: today,
+            });
+          }
+          
+          // Add new physician entry
+          history.push({
+            physician: newPhysician,
+            start_date: today,
+            end_date: null,
+          });
+          
+          updateData.physician_history = JSON.stringify(history);
+        }
+        
+        updateData.physician = newPhysician;
       }
 
       const { error } = await supabase
@@ -383,7 +430,7 @@ const PatientDetail = () => {
                               <p className="text-sm">{caseItem.classification}</p>
                             </div>
                             <div>
-                              <p className="text-sm font-medium text-muted-foreground">Physician</p>
+                              <p className="text-sm font-medium text-muted-foreground">Current Physician</p>
                               <p className="text-sm">{caseItem.physician || "—"}</p>
                             </div>
                             <div>
@@ -391,6 +438,28 @@ const PatientDetail = () => {
                               <p className="text-sm">{caseItem.duration} days</p>
                             </div>
                           </div>
+                          {(() => {
+                            const history = getPhysicianHistory(caseItem);
+                            if (history.length > 0) {
+                              return (
+                                <div>
+                                  <p className="text-sm font-medium text-muted-foreground mb-2">Physician History</p>
+                                  <div className="space-y-1 border rounded-md p-3 bg-secondary/30">
+                                    {history.map((entry: any, idx: number) => (
+                                      <div key={idx} className="text-sm">
+                                        <span className="font-medium">{entry.physician}</span>
+                                        <span className="text-muted-foreground ml-2">
+                                          ({entry.start_date ? new Date(entry.start_date).toLocaleDateString() : "N/A"}
+                                          {entry.end_date ? ` - ${new Date(entry.end_date).toLocaleDateString()}` : " - Present"})
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
                           {caseItem.symptoms && (
                             <div>
                               <p className="text-sm font-medium text-muted-foreground">Symptoms</p>
