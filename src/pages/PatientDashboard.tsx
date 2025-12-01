@@ -12,6 +12,15 @@ const PatientDashboard = () => {
   const [cases, setCases] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const getDurationDays = (dateStr: string | null | undefined) => {
+    if (!dateStr) return 0;
+    const start = new Date(dateStr).getTime();
+    const now = Date.now();
+    if (Number.isNaN(start)) return 0;
+    const diffDays = Math.floor((now - start) / (1000 * 60 * 60 * 24));
+    return diffDays < 0 ? 0 : diffDays;
+  };
+
   useEffect(() => {
     const fetchCases = async () => {
       if (!caseId) {
@@ -219,7 +228,7 @@ const PatientDashboard = () => {
                         </div>
                         <div>
                           <p className="text-sm font-medium text-muted-foreground">Duration</p>
-                          <p className="text-sm">{caseItem.duration} days</p>
+                          <p className="text-sm">{getDurationDays(caseItem.date_of_encounter)} days</p>
                         </div>
                         <div>
                           <p className="text-sm font-medium text-muted-foreground">Classification</p>
@@ -289,7 +298,7 @@ const PatientDashboard = () => {
                     
                     <div className="flex gap-4 text-sm text-muted-foreground mb-2">
                       <span>Date: {new Date(caseItem.date_of_encounter).toLocaleDateString()}</span>
-                      <span>Day {caseItem.duration}</span>
+                      <span>Day {getDurationDays(caseItem.date_of_encounter)}</span>
                     </div>
                     
                     {caseItem.classification && (

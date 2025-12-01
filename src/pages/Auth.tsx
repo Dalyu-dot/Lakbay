@@ -271,7 +271,7 @@ const Auth = () => {
           throw new Error("Please provide full name and password.");
         }
 
-        // Check if patient with same name already exists (case-insensitive)
+        // Check if patient with same name already exists (case insensitive)
         const { data: existingPatients, error: checkError } = await supabase
           .from("users")
           .select("full_name")

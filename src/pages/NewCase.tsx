@@ -15,6 +15,7 @@ const NewCase = () => {
   const today = new Date().toISOString().split("T")[0];
   const [formData, setFormData] = useState({
     patientId: "",
+    patientName: "",
     dateOfEncounter: today,
     physician: "",
     classification: "",
@@ -98,6 +99,7 @@ const NewCase = () => {
       const { error } = await supabase.from("cases").insert({
         id: caseId,
         patient_identifier: formData.patientId,
+        patient_name: formData.patientName || null,
         current_stage: "New Case",
         duration: 0,
         alert: "normal",
@@ -177,74 +179,88 @@ const NewCase = () => {
             <CardContent className="space-y-4">
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2 relative">
-                  <Label htmlFor="patientId">Patient (Case ID) *</Label>
-                  <div className="relative">
-                    <Input
-                      id="patientId"
-                      placeholder="Search or enter new Case ID (e.g., JD-2025-001)"
-                      value={patientSearchTerm}
-                      onChange={(e) => {
-                        handlePatientInputChange(e.target.value);
-                        handleChange("patientId", e.target.value);
-                      }}
-                      onFocus={() => setShowPatientDropdown(true)}
-                      onBlur={() => {
-                        // Delay to allow click on dropdown item
-                        setTimeout(() => setShowPatientDropdown(false), 200);
-                      }}
-                      required
-                    />
-                    {showPatientDropdown && patientSearchTerm && filteredPatients.length > 0 && (
-                      <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-60 overflow-auto">
-                        {filteredPatients.slice(0, 10).map((patientId) => (
-                          <div
-                            key={patientId}
-                            className="px-4 py-2 cursor-pointer hover:bg-accent hover:text-accent-foreground text-sm"
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              handlePatientSelect(patientId);
-                            }}
-                          >
-                            {patientId}
-                          </div>
-                        ))}
-                        {filteredPatients.length > 10 && (
-                          <div className="px-4 py-2 text-xs text-muted-foreground border-t">
-                            {filteredPatients.length - 10} more results...
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="patientId">Case ID *</Label>
+                      <div className="relative">
+                        <Input
+                          id="patientId"
+                          placeholder="Search or enter new Case ID (e.g., JD-2025-001)"
+                          value={patientSearchTerm}
+                          onChange={(e) => {
+                            handlePatientInputChange(e.target.value);
+                            handleChange("patientId", e.target.value);
+                          }}
+                          onFocus={() => setShowPatientDropdown(true)}
+                          onBlur={() => {
+                            // Delay to allow click on dropdown item
+                            setTimeout(() => setShowPatientDropdown(false), 200);
+                          }}
+                          required
+                        />
+                        {showPatientDropdown && patientSearchTerm && filteredPatients.length > 0 && (
+                          <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-60 overflow-auto">
+                            {filteredPatients.slice(0, 10).map((patientId) => (
+                              <div
+                                key={patientId}
+                                className="px-4 py-2 cursor-pointer hover:bg-accent hover:text-accent-foreground text-sm"
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  handlePatientSelect(patientId);
+                                }}
+                              >
+                                {patientId}
+                              </div>
+                            ))}
+                            {filteredPatients.length > 10 && (
+                              <div className="px-4 py-2 text-xs text-muted-foreground border-t">
+                                {filteredPatients.length - 10} more results...
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
-                    )}
-                  </div>
-                  {patientSearchTerm && filteredPatients.length === 0 && existingPatients.length > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      No matching patients found. This will create a new case.
-                    </p>
-                  )}
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="dateOfEncounter">Date of Encounter *</Label>
-                  <Input
-                    id="dateOfEncounter"
-                    type="date"
-                    value={formData.dateOfEncounter}
-                    onChange={(e) => handleChange("dateOfEncounter", e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
+                      {patientSearchTerm && filteredPatients.length === 0 && existingPatients.length > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          No matching patients found. This will create a new case.
+                        </p>
+                      )}
+                    </div>
 
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="physician">Physician Name *</Label>
-                  <Input
-                    id="physician"
-                    placeholder="Dr. Name"
-                    value={formData.physician}
-                    onChange={(e) => handleChange("physician", e.target.value)}
-                    required
-                  />
+                    <div className="space-y-2">
+                      <Label htmlFor="dateOfEncounter">Date of Encounter *</Label>
+                      <Input
+                        id="dateOfEncounter"
+                        type="date"
+                        value={formData.dateOfEncounter}
+                        onChange={(e) => handleChange("dateOfEncounter", e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="patientName">Patient Name *</Label>
+                      <Input
+                        id="patientName"
+                        placeholder="e.g., Juan Dela Cruz"
+                        value={formData.patientName}
+                        onChange={(e) => handleChange("patientName", e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="physician">Physician Name *</Label>
+                      <Input
+                        id="physician"
+                        placeholder="Dr. Name"
+                        value={formData.physician}
+                        onChange={(e) => handleChange("physician", e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </CardContent>

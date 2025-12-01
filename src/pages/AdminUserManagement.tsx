@@ -42,6 +42,58 @@ const AdminUserManagement = () => {
     }
   };
 
+  const handleAssignCaseNumber = async (user: any) => {
+    if (user.role !== "patient") {
+      toast({
+        title: "Not a patient account",
+        description: "Only patient users can be assigned a case ID.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const current = user.case_number || "";
+    const input = window.prompt(
+      `Assign or update Case ID for ${user.full_name || user.email || "patient"}:`,
+      current,
+    );
+
+    if (input === null) return; // user cancelled
+
+    const trimmed = input.trim();
+    if (!trimmed) {
+      toast({
+        title: "Case ID required",
+        description: "Please provide a non-empty Case ID.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("users")
+        .update({ case_number: trimmed })
+        .eq("id", user.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Case ID updated",
+        description: `Case ID for ${user.full_name || user.email || "patient"} set to ${trimmed}.`,
+      });
+
+      await fetchUsers();
+    } catch (err) {
+      console.error("Failed to assign case number:", err);
+      toast({
+        title: "Error",
+        description: "Failed to assign Case ID. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleApprove = async (userId: string) => {
     try {
       const { error } = await supabase
@@ -232,7 +284,17 @@ const AdminUserManagement = () => {
                       {approvedUsers.map((user) => (
                         <tr key={user.id} className="border-b border-border hover:bg-secondary/30">
                           <td className="py-3 px-4 text-sm">
-                            {user.full_name || user.email || "Unknown"}
+                            {user.role === "patient" ? (
+                              <button
+                                type="button"
+                                className="text-primary hover:underline"
+                                onClick={() => handleAssignCaseNumber(user)}
+                              >
+                                {user.full_name || user.email || "Unknown"}
+                              </button>
+                            ) : (
+                              user.full_name || user.email || "Unknown"
+                            )}
                           </td>
                           <td className="py-3 px-4">{getRoleBadge(user.role)}</td>
                           <td className="py-3 px-4 text-sm text-muted-foreground">

@@ -28,6 +28,15 @@ const ProviderDashboard = () => {
   const [uniquePatients, setUniquePatients] = useState<string[]>([]);
   const [hasNotified, setHasNotified] = useState(false);
 
+  const getDurationDays = (dateStr: string | null | undefined) => {
+    if (!dateStr) return 0;
+    const start = new Date(dateStr).getTime();
+    const now = Date.now();
+    if (Number.isNaN(start)) return 0;
+    const diffDays = Math.floor((now - start) / (1000 * 60 * 60 * 24));
+    return diffDays < 0 ? 0 : diffDays;
+  };
+
   useEffect(() => {
     const fetchCases = async () => {
       try {
@@ -43,7 +52,7 @@ const ProviderDashboard = () => {
             patientIdentifier: c.patient_identifier,
             institution: c.institution ?? "",
             currentStage: c.current_stage,
-            duration: c.duration ?? 0,
+            duration: getDurationDays(c.date_of_encounter),
             alert: c.alert ?? "normal",
             classification: c.classification,
             completion_reason: c.completion_reason,

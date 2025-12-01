@@ -54,6 +54,16 @@ const PatientDetail = () => {
   }, [patientId]);
 
   const handleEdit = (caseItem: any) => {
+    // Only admins can edit cases
+    if (!isAdmin) {
+      toast({
+        title: "Access restricted",
+        description: "Only admins can edit case details.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setEditingCaseId(caseItem.id);
     setEditForm({
       current_stage: caseItem.current_stage,
@@ -79,6 +89,16 @@ const PatientDetail = () => {
   };
 
   const handleCompleteCase = (caseItem: any) => {
+    // Only admins can complete cases
+    if (!isAdmin) {
+      toast({
+        title: "Access restricted",
+        description: "Only admins can mark a case as completed.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setCompletingCaseId(caseItem.id);
     setCompletionReason("");
     setCompletionNotes("");
@@ -269,7 +289,17 @@ const PatientDetail = () => {
   return (
     <DashboardLayout title={`Patient: ${patientId}`}>
       <div className="space-y-6">
-        <Button variant="outline" onClick={() => navigate("/provider")}>
+        <Button
+          variant="outline"
+          onClick={() => {
+            // Return to the correct dashboard based on role
+            if (isAdmin) {
+              navigate("/admin");
+            } else {
+              navigate("/provider");
+            }
+          }}
+        >
           ← Back to Dashboard
         </Button>
 
@@ -484,21 +514,23 @@ const PatientDetail = () => {
                               <p className="text-sm">{new Date(caseItem.completion_date).toLocaleDateString()}</p>
                             </div>
                           )}
-                          <div className="flex gap-2">
-                            {!isCaseCompleted(caseItem) && (
-                              <Button 
-                                variant="default" 
-                                size="sm" 
-                                onClick={() => handleCompleteCase(caseItem)}
-                                className="bg-green-600 hover:bg-green-700"
-                              >
-                                Complete Case
+                          {isAdmin && (
+                            <div className="flex gap-2">
+                              {!isCaseCompleted(caseItem) && (
+                                <Button 
+                                  variant="default" 
+                                  size="sm" 
+                                  onClick={() => handleCompleteCase(caseItem)}
+                                  className="bg-green-600 hover:bg-green-700"
+                                >
+                                  Complete Case
+                                </Button>
+                              )}
+                              <Button variant="outline" size="sm" onClick={() => handleEdit(caseItem)}>
+                                Edit Case
                               </Button>
-                            )}
-                            <Button variant="outline" size="sm" onClick={() => handleEdit(caseItem)}>
-                              Edit Case
-                            </Button>
-                          </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </CardContent>
