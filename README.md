@@ -1,35 +1,8 @@
 # LAKBAY
 
-## Project info
+## Link to system
 
-**URL**: 
-
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-Open the project locally and start developing.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-# Step 1: Clone the repository using the project's Git URL.
-git clone https://github.com/Dalyu-dot/Lakbay.git
-
-# Step 2: Navigate to the project directory.
-cd CMSC-128.1_MP
-
-# Step 3: Install the dependencies.
-npm install
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+**https://lakbay-lung-nodule.netlify.app/**: 
 
 
 This project is built with:
