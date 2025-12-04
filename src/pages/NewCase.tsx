@@ -15,7 +15,6 @@ const NewCase = () => {
   const today = new Date().toISOString().split("T")[0];
   const [formData, setFormData] = useState({
     patientId: "",
-    patientName: "",
     dateOfEncounter: today,
     physician: "",
     classification: "",
@@ -89,24 +88,15 @@ const NewCase = () => {
 
     // Save to Supabase `cases` table
     try {
-      // Initialize physician history with the first physician
-      const physicianHistory = formData.physician ? [{
-        physician: formData.physician,
-        start_date: formData.dateOfEncounter,
-        end_date: null,
-      }] : [];
-
       const { error } = await supabase.from("cases").insert({
         id: caseId,
         patient_identifier: formData.patientId,
-        patient_name: formData.patientName || null,
         current_stage: "New Case",
         duration: 0,
         alert: "normal",
         classification: classification,
         date_of_encounter: formData.dateOfEncounter,
         physician: formData.physician,
-        physician_history: JSON.stringify(physicianHistory),
         symptoms: formData.symptoms || null,
         imaging_date: formData.imagingDate || null,
         imaging_type: formData.imagingType || null,
@@ -241,14 +231,7 @@ const NewCase = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
                     <div className="space-y-2">
-                      <Label htmlFor="patientName">Patient Name *</Label>
-                      <Input
-                        id="patientName"
-                        placeholder="e.g., Juan Dela Cruz"
-                        value={formData.patientName}
-                        onChange={(e) => handleChange("patientName", e.target.value)}
-                        required
-                      />
+                    {/* Removed Patient Name input */}
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="physician">Physician Name *</Label>

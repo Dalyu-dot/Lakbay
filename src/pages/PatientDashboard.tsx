@@ -3,8 +3,8 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, Circle, Clock, AlertCircle } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { supabase } from "@/lib/supabaseClient";
+import { formatDateDDMMYYYY } from "@/lib/utils";
 
 const PatientDashboard = () => {
   const caseId = (typeof window !== "undefined" && localStorage.getItem("patientCaseId")) || "";
@@ -177,7 +177,7 @@ const PatientDashboard = () => {
             )}
             {currentStatus.completion_date && (
               <p className="text-foreground mt-1">
-                <strong>Completed On:</strong> {new Date(currentStatus.completion_date).toLocaleDateString()}
+                <strong>Completed On:</strong> {formatDateDDMMYYYY(currentStatus.completion_date)}
               </p>
             )}
             {currentStatus.findings && (
@@ -209,7 +209,7 @@ const PatientDashboard = () => {
                           Case {index + 1}: {caseItem.classification}
                         </CardTitle>
                         <CardDescription>
-                          Encounter Date: {new Date(caseItem.date_of_encounter).toLocaleDateString()}
+                          Encounter Date: {formatDateDDMMYYYY(caseItem.date_of_encounter)}
                         </CardDescription>
                       </div>
                       {getStatusBadge(caseItem)}
@@ -256,7 +256,7 @@ const PatientDashboard = () => {
                       {caseItem.completion_date && (
                         <div>
                           <p className="text-sm font-medium text-muted-foreground">Completion Date</p>
-                          <p className="text-sm">{new Date(caseItem.completion_date).toLocaleDateString()}</p>
+                          <p className="text-sm">{formatDateDDMMYYYY(caseItem.completion_date)}</p>
                         </div>
                       )}
                     </div>
@@ -297,7 +297,7 @@ const PatientDashboard = () => {
                     </div>
                     
                     <div className="flex gap-4 text-sm text-muted-foreground mb-2">
-                      <span>Date: {new Date(caseItem.date_of_encounter).toLocaleDateString()}</span>
+                      <span>Date: {formatDateDDMMYYYY(caseItem.date_of_encounter)}</span>
                       <span>Day {getDurationDays(caseItem.date_of_encounter)}</span>
                     </div>
                     
@@ -313,7 +313,7 @@ const PatientDashboard = () => {
                     )}
                     {caseItem.completion_date && (
                       <div className="text-sm text-muted-foreground mb-2">
-                        Completed: {new Date(caseItem.completion_date).toLocaleDateString()}
+                        Completed: {formatDateDDMMYYYY(caseItem.completion_date)}
                       </div>
                     )}
                   </div>
@@ -323,6 +323,59 @@ const PatientDashboard = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Educational Timeline for Lung Mass/Nodule Management */}
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle className="text-lg">Potential Timeline for Management (Lung Mass/Nodules)</CardTitle>
+          <CardDescription>
+            This is an example of how care may progress over time. Your actual plan may differ based on your case.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <div className="min-w-[900px] border border-border rounded-md">
+              <div className="grid grid-cols-8 divide-x divide-border bg-muted/60">
+                <div className="px-3 py-2 text-center font-semibold text-sm">Week 1</div>
+                <div className="px-3 py-2 text-center font-semibold text-sm">Week 2</div>
+                <div className="px-3 py-2 text-center font-semibold text-sm">Week 3</div>
+                <div className="px-3 py-2 text-center font-semibold text-sm">Week 4</div>
+                <div className="px-3 py-2 text-center font-semibold text-sm">Week 5</div>
+                <div className="px-3 py-2 text-center font-semibold text-sm">Week 6</div>
+                <div className="px-3 py-2 text-center font-semibold text-sm">Week 7</div>
+                <div className="px-3 py-2 text-center font-semibold text-sm">Week 8</div>
+              </div>
+              <div className="grid grid-cols-8 divide-x divide-border">
+                <div className="px-3 py-4 text-xs text-center">
+                  Initial consultations, scheduling for chest CT scan/imaging
+                </div>
+                <div className="px-3 py-4 text-xs text-center">
+                  Chest CT scan/imaging performed, review of initial results
+                </div>
+                <div className="px-3 py-4 text-xs text-center">
+                  Planning and scheduling for biopsy (including multidisciplinary conference/MDC)
+                </div>
+                <div className="px-3 py-4 text-xs text-center">
+                  Awaiting histopathology report
+                </div>
+                <div className="px-3 py-4 text-xs text-center">
+                  Review and discussion of histopathology report
+                </div>
+                <div className="px-3 py-4 text-xs text-center">
+                  Possible further histopathology testing or replanning biopsy (if needed)
+                </div>
+                <div className="px-3 py-4 text-xs text-center">
+                  Preparation for therapeutic multidisciplinary conference (MDC)
+                </div>
+                <div className="px-3 py-4 text-xs text-center">
+                  Therapeutic MDC for definitive management planning
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
 
       {cases.length === 0 && (
         <Card>
