@@ -3,6 +3,9 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabaseClient";
@@ -12,6 +15,9 @@ const AdminUserManagement = () => {
   const [pendingUsers, setPendingUsers] = useState<any[]>([]);
   const [approvedUsers, setApprovedUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [assigningCase, setAssigningCase] = useState<any | null>(null);
+  const [caseNumberInput, setCaseNumberInput] = useState<string>("");
+  const [availableCases, setAvailableCases] = useState<any[]>([]);
 
   useEffect(() => {
     fetchUsers();
@@ -52,15 +58,38 @@ const AdminUserManagement = () => {
       return;
     }
 
-    const current = user.case_number || "";
-    const input = window.prompt(
-      `Assign or update Case ID for ${user.full_name || user.email || "patient"}:`,
-      current,
-    );
+    // Fetch available case numbers from cases table
+    try {
+      const { data: casesData, error: casesError } = await supabase
+        .from("cases")
+        .select("patient_identifier, patient_name")
+        .order("date_of_encounter", { ascending: false });
 
-    if (input === null) return; // user cancelled
+      if (casesError) throw casesError;
 
-    const trimmed = input.trim();
+      // Filter cases that match the patient's name exactly
+      const matchingCases = (casesData || []).filter((c: any) => 
+        c.patient_name && 
+        c.patient_name.toLowerCase().trim() === (user.full_name || "").toLowerCase().trim()
+      );
+
+      setAvailableCases(matchingCases);
+      setCaseNumberInput(user.case_number || "");
+      setAssigningCase(user);
+    } catch (err) {
+      console.error("Failed to fetch cases:", err);
+      toast({
+        title: "Error",
+        description: "Failed to load available cases. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const confirmAssignCaseNumber = async () => {
+    if (!assigningCase) return;
+
+    const trimmed = caseNumberInput.trim();
     if (!trimmed) {
       toast({
         title: "Case ID required",
@@ -74,15 +103,18 @@ const AdminUserManagement = () => {
       const { error } = await supabase
         .from("users")
         .update({ case_number: trimmed })
-        .eq("id", user.id);
+        .eq("id", assigningCase.id);
 
       if (error) throw error;
 
       toast({
         title: "Case ID updated",
-        description: `Case ID for ${user.full_name || user.email || "patient"} set to ${trimmed}.`,
+        description: `Case ID for ${assigningCase.full_name || assigningCase.email || "patient"} set to ${trimmed}.`,
       });
 
+      setAssigningCase(null);
+      setCaseNumberInput("");
+      setAvailableCases([]);
       await fetchUsers();
     } catch (err) {
       console.error("Failed to assign case number:", err);
@@ -284,21 +316,27 @@ const AdminUserManagement = () => {
                       {approvedUsers.map((user) => (
                         <tr key={user.id} className="border-b border-border hover:bg-secondary/30">
                           <td className="py-3 px-4 text-sm">
-                            {user.role === "patient" ? (
-                              <button
-                                type="button"
-                                className="text-primary hover:underline"
-                                onClick={() => handleAssignCaseNumber(user)}
-                              >
-                                {user.full_name || user.email || "Unknown"}
-                              </button>
-                            ) : (
-                              user.full_name || user.email || "Unknown"
-                            )}
+                            {user.full_name || user.email || "Unknown"}
                           </td>
                           <td className="py-3 px-4">{getRoleBadge(user.role)}</td>
-                          <td className="py-3 px-4 text-sm text-muted-foreground">
-                            {user.case_number || "—"}
+                          <td className="py-3 px-4">
+                            {user.role === "patient" ? (
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-muted-foreground">
+                                  {user.case_number || "—"}
+                                </span>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleAssignCaseNumber(user)}
+                                  className="h-7 text-xs"
+                                >
+                                  {user.case_number ? "Edit" : "Assign"}
+                                </Button>
+                              </div>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">—</span>
+                            )}
                           </td>
                           <td className="py-3 px-4">
                             <Badge variant="secondary" className="bg-green-100 text-green-800">
@@ -316,6 +354,58 @@ const AdminUserManagement = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Dialog for assigning case number */}
+      <Dialog open={assigningCase !== null} onOpenChange={(open) => !open && setAssigningCase(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assign Case ID</DialogTitle>
+            <DialogDescription>
+              Assign or update Case ID for {assigningCase?.full_name || assigningCase?.email || "patient"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {availableCases.length > 0 && (
+              <div>
+                <Label className="text-sm font-medium">Available Case IDs for this patient:</Label>
+                <div className="mt-2 space-y-1 max-h-32 overflow-y-auto border rounded-md p-2">
+                  {availableCases.map((c: any, idx: number) => (
+                    <div
+                      key={idx}
+                      className="text-sm p-1 hover:bg-secondary rounded cursor-pointer"
+                      onClick={() => setCaseNumberInput(c.patient_identifier)}
+                    >
+                      {c.patient_identifier}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="case-number">Case ID</Label>
+              <Input
+                id="case-number"
+                value={caseNumberInput}
+                onChange={(e) => setCaseNumberInput(e.target.value)}
+                placeholder="Enter Case ID"
+              />
+              {assigningCase?.case_number && (
+                <p className="text-xs text-muted-foreground">
+                  Current: {assigningCase.case_number}
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAssigningCase(null)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmAssignCaseNumber}>
+              {assigningCase?.case_number ? "Update" : "Assign"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 };

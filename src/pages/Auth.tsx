@@ -205,7 +205,7 @@ const Auth = () => {
           .maybeSingle();
 
         if (error) throw error;
-        if (!userData) throw new Error("Invalid credentials. Please check your details or sign up.");
+        if (!userData) throw new Error("Login failed. Please check your account information, or note that your signup may have been declined.");
         
         data = userData;
         
@@ -220,6 +220,14 @@ const Auth = () => {
       if (isPatient) {
         localStorage.setItem("patientFullName", data.full_name);
         localStorage.setItem("patientCaseId", data.case_number || "");
+      }
+      // Store provider email for case filtering
+      if (role === "provider" && data.email) {
+        localStorage.setItem("providerEmail", data.email);
+      }
+      // Store admin email if needed
+      if (role === "admin" && data.email) {
+        localStorage.setItem("adminEmail", data.email);
       }
 
       toast({
@@ -271,6 +279,8 @@ const Auth = () => {
           throw new Error("Please provide full name and password.");
         }
 
+        const trimmedName = fullName.trim();
+
         // Check if patient with same name already exists (case insensitive)
         const { data: existingPatients, error: checkError } = await supabase
           .from("users")
@@ -280,21 +290,49 @@ const Auth = () => {
         if (checkError) throw checkError;
 
         const nameExists = existingPatients?.some(
-          (p: any) => p.full_name?.toLowerCase().trim() === fullName.toLowerCase().trim()
+          (p: any) => p.full_name?.toLowerCase().trim() === trimmedName.toLowerCase()
         );
 
         if (nameExists) {
           throw new Error("A patient with this name already exists. Please sign in instead.");
         }
 
+        // Validate that patient name exactly matches an existing case patient_name
+        const { data: casesData, error: casesError } = await supabase
+          .from("cases")
+          .select("patient_name, patient_identifier")
+          .not("patient_name", "is", null);
+
+        if (casesError) throw casesError;
+
+        // Find exact match (case-sensitive for names)
+        const matchingCase = (casesData || []).find(
+          (c: any) => c.patient_name && c.patient_name.trim() === trimmedName
+        );
+
+        if (!matchingCase) {
+          throw new Error(
+            `No case found for patient name "${trimmedName}". Please ensure the name matches exactly as entered in the case (case-sensitive).`
+          );
+        }
+
+        // Auto-assign case_number from matching case
+        const caseNumber = matchingCase.patient_identifier;
+
         const { error } = await supabase.from("users").insert({
           role: "patient",
-          full_name: fullName.trim(),
+          full_name: trimmedName,
           password: patientPassword,
-          approved: false, // Pending approval - provider will assign case number
+          case_number: caseNumber, // Auto-assign case number from matching case
+          approved: false, // Still pending admin approval
         });
 
         if (error) throw error;
+
+        toast({
+          title: "Sign-up request submitted!",
+          description: `Your account is linked to case ${caseNumber} and is pending admin approval.`,
+        });
       } else {
         if (!email || !password) {
           throw new Error("Please provide email and password.");
@@ -309,12 +347,12 @@ const Auth = () => {
         });
 
         if (error) throw error;
-      }
 
-      toast({
-        title: "Sign-up request submitted!",
-        description: "Your account is pending admin approval. You will be notified once approved.",
-      });
+        toast({
+          title: "Sign-up request submitted!",
+          description: "Your account is pending admin approval. You will be notified once approved.",
+        });
+      }
 
       // Don't navigate - user must wait for approval
       // Clear form
@@ -448,7 +486,7 @@ const Auth = () => {
                   {role === "patient" ? (
                     <>
                       <div className="space-y-2">
-                        <Label htmlFor="signup-fullname">Full Name (as provided by your provider)</Label>
+                        <Label htmlFor="signup-fullname">Full Name</Label>
                         <Input
                           id="signup-fullname"
                           placeholder="e.g., Juan Dela Cruz"
@@ -457,7 +495,7 @@ const Auth = () => {
                           required
                         />
                         <p className="text-xs text-muted-foreground">
-                          Use the exact name as provided by your healthcare provider
+                         
                         </p>
                       </div>
                       <div className="space-y-2">

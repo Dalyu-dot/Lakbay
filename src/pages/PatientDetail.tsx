@@ -18,6 +18,7 @@ const PatientDetail = () => {
   const navigate = useNavigate();
   const [cases, setCases] = useState<any[]>([]);
   const [editingCaseId, setEditingCaseId] = useState<string | null>(null);
+  const [editingAlertOnly, setEditingAlertOnly] = useState<boolean>(false); // For admin alert-only editing
   const [editForm, setEditForm] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [completingCaseId, setCompletingCaseId] = useState<string | null>(null);
@@ -25,6 +26,10 @@ const PatientDetail = () => {
   const [completionNotes, setCompletionNotes] = useState<string>("");
   const userRole = typeof window !== "undefined" ? localStorage.getItem("userRole") : null;
   const isAdmin = userRole === "admin";
+  const isProvider = userRole === "provider";
+  const canEdit = isProvider; // Only providers can edit full case details
+  const canComplete = isProvider || isAdmin; // Both providers and admins can complete cases
+  const canEditAlert = isAdmin || isProvider; // Both can edit alert status
 
   useEffect(() => {
     const fetchCases = async () => {
@@ -54,16 +59,17 @@ const PatientDetail = () => {
   }, [patientId]);
 
   const handleEdit = (caseItem: any) => {
-    // Only admins can edit cases
-    if (!isAdmin) {
+    // Only providers can edit full case details
+    if (!canEdit) {
       toast({
         title: "Access restricted",
-        description: "Only admins can edit case details.",
+        description: "Only providers can edit case details.",
         variant: "destructive",
       });
       return;
     }
 
+    setEditingAlertOnly(false);
     setEditingCaseId(caseItem.id);
     setEditForm({
       current_stage: caseItem.current_stage,
@@ -75,12 +81,29 @@ const PatientDetail = () => {
     });
   };
 
-  const handleCompleteCase = (caseItem: any) => {
-    // Only admins can complete cases
-    if (!isAdmin) {
+  const handleEditAlert = (caseItem: any) => {
+    if (!canEditAlert) {
       toast({
         title: "Access restricted",
-        description: "Only admins can mark a case as completed.",
+        description: "You cannot edit case details.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setEditingAlertOnly(true);
+    setEditingCaseId(caseItem.id);
+    setEditForm({
+      alert: caseItem.alert || "normal",
+    });
+  };
+
+  const handleCompleteCase = (caseItem: any) => {
+    // Both providers and admins can complete cases
+    if (!canComplete) {
+      toast({
+        title: "Access restricted",
+        description: "You cannot mark a case as completed.",
         variant: "destructive",
       });
       return;
@@ -165,35 +188,57 @@ const PatientDetail = () => {
   const handleSave = async (caseId: string) => {
     try {
       const caseItem = cases.find(c => c.id === caseId);
-      const updateData: any = {
-        current_stage: editForm.current_stage,
-        alert: editForm.alert,
-        classification: editForm.classification,
-        symptoms: editForm.symptoms,
-        findings: editForm.findings,
-      };
+      
+      // If admin is editing alert only, only update alert field
+      if (editingAlertOnly && isAdmin) {
+        const updateData: any = {
+          alert: editForm.alert,
+        };
 
-      // Admin can reassign provider
-      if (isAdmin && editForm.physician) {
-        const currentPhysician = caseItem?.physician || "";
-        const newPhysician = editForm.physician.trim();
-        
-        updateData.physician = newPhysician;
+        const { error } = await supabase
+          .from("cases")
+          .update(updateData)
+          .eq("id", caseId);
+
+        if (error) throw error;
+
+        toast({
+          title: "Alert status updated",
+          description: "The alert status has been successfully updated.",
+        });
+      } else {
+        // Provider can edit all fields
+        const updateData: any = {
+          current_stage: editForm.current_stage,
+          alert: editForm.alert,
+          classification: editForm.classification,
+          symptoms: editForm.symptoms,
+          findings: editForm.findings,
+        };
+
+        // Providers can update provider name
+        if (editForm.physician) {
+          const currentPhysician = caseItem?.physician || "";
+          const newPhysician = editForm.physician.trim();
+          
+          updateData.physician = newPhysician;
+        }
+
+        const { error } = await supabase
+          .from("cases")
+          .update(updateData)
+          .eq("id", caseId);
+
+        if (error) throw error;
+
+        toast({
+          title: "Case updated",
+          description: "The case has been successfully updated.",
+        });
       }
 
-      const { error } = await supabase
-        .from("cases")
-        .update(updateData)
-        .eq("id", caseId);
-
-      if (error) throw error;
-
-      toast({
-        title: "Case updated",
-        description: "The case has been successfully updated.",
-      });
-
       setEditingCaseId(null);
+      setEditingAlertOnly(false);
       // Refresh cases
       const { data } = await supabase
         .from("cases")
@@ -289,122 +334,158 @@ const PatientDetail = () => {
                     <CardContent className="space-y-4">
                       {editingCaseId === caseItem.id ? (
                         <div className="space-y-4">
-                          <div className="grid md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label>Current Stage</Label>
-                              <Select
-                                value={editForm.current_stage}
-                                onValueChange={(value) =>
-                                  setEditForm({ ...editForm, current_stage: value })
-                                }
-                              >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="New Case">New Case</SelectItem>
-                                  <SelectItem value="Initial Imaging">Initial Imaging</SelectItem>
-                                  <SelectItem value="Biopsy Pending">Biopsy Pending</SelectItem>
-                                  <SelectItem value="Biopsy Performed">Biopsy Performed</SelectItem>
-                                  <SelectItem value="MDC Review">MDC Review</SelectItem>
-                                  <SelectItem value="Imaging Follow-up">Imaging Follow-up</SelectItem>
-                                  <SelectItem value="Benign Result">Benign Result</SelectItem>
-                                  <SelectItem value="Malignant Result">Malignant Result</SelectItem>
-                                  <SelectItem value="Treatment Plan">Treatment Plan</SelectItem>
-                                  <SelectItem value="Completed - Treatment Done">Completed - Treatment Done</SelectItem>
-                                  <SelectItem value="Completed - Patient Expired">Completed - Patient Expired</SelectItem>
-                                  <SelectItem value="Completed - Patient Opted Out">Completed - Patient Opted Out</SelectItem>
-                                  <SelectItem value="Completed - Team Decision">Completed - Team Decision</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Status Alert</Label>
-                              <Select
-                                value={editForm.alert}
-                                onValueChange={(value) => setEditForm({ ...editForm, alert: value })}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="normal">On Track</SelectItem>
-                                  <SelectItem value="warning">Due Soon</SelectItem>
-                                  <SelectItem value="overdue">Overdue</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-                          {isAdmin && (
-                            <div className="space-y-2">
-                              <Label>Provider (Reassign)</Label>
-                              <Input
-                                value={editForm.physician}
-                                onChange={(e) =>
-                                  setEditForm({ ...editForm, physician: e.target.value })
-                                }
-                                placeholder="Enter new provider name"
-                              />
-                              <p className="text-xs text-muted-foreground">
-                                Admin: You can reassign this case to a different provider
-                              </p>
-                            </div>
+                          {editingAlertOnly && isAdmin ? (
+                            // Admin can only edit alert status
+                            <>
+                              <div className="space-y-2">
+                                <Label>Status Alert</Label>
+                                <Select
+                                  value={editForm.alert}
+                                  onValueChange={(value) => setEditForm({ ...editForm, alert: value })}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="normal">On Track</SelectItem>
+                                    <SelectItem value="warning">Due Soon</SelectItem>
+                                    <SelectItem value="overdue">Overdue</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button onClick={() => handleSave(caseItem.id)}>Save Alert Status</Button>
+                                <Button
+                                  variant="outline"
+                                  onClick={() => {
+                                    setEditingCaseId(null);
+                                    setEditingAlertOnly(false);
+                                    setEditForm(null);
+                                  }}
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            </>
+                          ) : (
+                            // Provider can edit all fields
+                            <>
+                              <div className="grid md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label>Current Stage</Label>
+                                  <Select
+                                    value={editForm.current_stage}
+                                    onValueChange={(value) =>
+                                      setEditForm({ ...editForm, current_stage: value })
+                                    }
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="New Case">New Case</SelectItem>
+                                      <SelectItem value="Initial Imaging">Initial Imaging</SelectItem>
+                                      <SelectItem value="Biopsy Pending">Biopsy Pending</SelectItem>
+                                      <SelectItem value="Biopsy Performed">Biopsy Performed</SelectItem>
+                                      <SelectItem value="MDC Review">MDC Review</SelectItem>
+                                      <SelectItem value="Imaging Follow-up">Imaging Follow-up</SelectItem>
+                                      <SelectItem value="Benign Result">Benign Result</SelectItem>
+                                      <SelectItem value="Malignant Result">Malignant Result</SelectItem>
+                                      <SelectItem value="Treatment Plan">Treatment Plan</SelectItem>
+                                      <SelectItem value="Completed - Treatment Done">Completed - Treatment Done</SelectItem>
+                                      <SelectItem value="Completed - Patient Expired">Completed - Patient Expired</SelectItem>
+                                      <SelectItem value="Completed - Patient Opted Out">Completed - Patient Opted Out</SelectItem>
+                                      <SelectItem value="Completed - Team Decision">Completed - Team Decision</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Status Alert</Label>
+                                  <Select
+                                    value={editForm.alert}
+                                    onValueChange={(value) => setEditForm({ ...editForm, alert: value })}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="normal">On Track</SelectItem>
+                                      <SelectItem value="warning">Due Soon</SelectItem>
+                                      <SelectItem value="overdue">Overdue</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </div>
+                              {isProvider && (
+                                <div className="space-y-2">
+                                  <Label>Provider</Label>
+                                  <Input
+                                    value={editForm.physician}
+                                    onChange={(e) =>
+                                      setEditForm({ ...editForm, physician: e.target.value })
+                                    }
+                                    placeholder="Provider name"
+                                  />
+                                </div>
+                              )}
+                              <div className="space-y-2">
+                                <Label>Classification</Label>
+                                <Select
+                                  value={editForm.classification}
+                                  onValueChange={(value) =>
+                                    setEditForm({ ...editForm, classification: value })
+                                  }
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="Pulmonary nodule">Pulmonary nodule</SelectItem>
+                                    <SelectItem value="Pulmonary nodule with extrathoracic malignancy">
+                                      Pulmonary nodule with extrathoracic malignancy
+                                    </SelectItem>
+                                    <SelectItem value="Pulmonary mass">Pulmonary mass</SelectItem>
+                                    <SelectItem value="Pulmonary mass with extrathoracic malignancy">
+                                      Pulmonary mass with extrathoracic malignancy
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Symptoms</Label>
+                                <Textarea
+                                  value={editForm.symptoms}
+                                  onChange={(e) =>
+                                    setEditForm({ ...editForm, symptoms: e.target.value })
+                                  }
+                                  rows={3}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Findings</Label>
+                                <Textarea
+                                  value={editForm.findings}
+                                  onChange={(e) =>
+                                    setEditForm({ ...editForm, findings: e.target.value })
+                                  }
+                                  rows={3}
+                                />
+                              </div>
+                              <div className="flex gap-2">
+                                <Button onClick={() => handleSave(caseItem.id)}>Save Changes</Button>
+                                <Button
+                                  variant="outline"
+                                  onClick={() => {
+                                    setEditingCaseId(null);
+                                    setEditingAlertOnly(false);
+                                    setEditForm(null);
+                                  }}
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            </>
                           )}
-                          <div className="space-y-2">
-                            <Label>Classification</Label>
-                            <Select
-                              value={editForm.classification}
-                              onValueChange={(value) =>
-                                setEditForm({ ...editForm, classification: value })
-                              }
-                            >
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Pulmonary nodule">Pulmonary nodule</SelectItem>
-                                <SelectItem value="Pulmonary nodule with extrathoracic malignancy">
-                                  Pulmonary nodule with extrathoracic malignancy
-                                </SelectItem>
-                                <SelectItem value="Pulmonary mass">Pulmonary mass</SelectItem>
-                                <SelectItem value="Pulmonary mass with extrathoracic malignancy">
-                                  Pulmonary mass with extrathoracic malignancy
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Symptoms</Label>
-                            <Textarea
-                              value={editForm.symptoms}
-                              onChange={(e) =>
-                                setEditForm({ ...editForm, symptoms: e.target.value })
-                              }
-                              rows={3}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Findings</Label>
-                            <Textarea
-                              value={editForm.findings}
-                              onChange={(e) =>
-                                setEditForm({ ...editForm, findings: e.target.value })
-                              }
-                              rows={3}
-                            />
-                          </div>
-                          <div className="flex gap-2">
-                            <Button onClick={() => handleSave(caseItem.id)}>Save Changes</Button>
-                            <Button
-                              variant="outline"
-                              onClick={() => {
-                                setEditingCaseId(null);
-                                setEditForm(null);
-                              }}
-                            >
-                              Cancel
-                            </Button>
-                          </div>
                         </div>
                       ) : (
                         <div className="space-y-2">
@@ -450,9 +531,9 @@ const PatientDetail = () => {
                               <p className="text-sm">{new Date(caseItem.completion_date).toLocaleDateString()}</p>
                             </div>
                           )}
-                          {isAdmin && (
+                          {(canEdit || canComplete || canEditAlert) && (
                             <div className="flex gap-2">
-                              {!isCaseCompleted(caseItem) && (
+                              {!isCaseCompleted(caseItem) && canComplete && (
                                 <Button 
                                   variant="default" 
                                   size="sm" 
@@ -462,9 +543,20 @@ const PatientDetail = () => {
                                   Complete Case
                                 </Button>
                               )}
-                              <Button variant="outline" size="sm" onClick={() => handleEdit(caseItem)}>
-                                Edit Case
-                              </Button>
+                              {canEdit && (
+                                <Button variant="outline" size="sm" onClick={() => handleEdit(caseItem)}>
+                                  Edit Case
+                                </Button>
+                              )}
+                              {isAdmin && !canEdit && (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => handleEditAlert(caseItem)}
+                                >
+                                  Edit Alert Status
+                                </Button>
+                              )}
                             </div>
                           )}
                         </div>

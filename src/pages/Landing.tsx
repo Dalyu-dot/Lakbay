@@ -37,57 +37,6 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Features Grid */}
-      <section className="py-16 px-4 bg-secondary/30">
-        <div className="container mx-auto max-w-6xl">
-          <h3 className="text-3xl font-bold text-center text-foreground mb-12">
-            Core Features
-          </h3>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Tracking</CardTitle>
-                <CardDescription>Track case progress.</CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Documentation</CardTitle>
-                <CardDescription>Enter clinical data.</CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Alerts</CardTitle>
-                <CardDescription>Get notifications.</CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Roles</CardTitle>
-                <CardDescription>Views for each role.</CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Analytics</CardTitle>
-                <CardDescription>See charts and trends.</CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Security</CardTitle>
-                <CardDescription>Keep data private.</CardDescription>
-              </CardHeader>
-            </Card>
-          </div>
-        </div>
-      </section>
 
       {/* User Roles Section */}
       <section className="py-16 px-4">

@@ -148,45 +148,88 @@ const PatientDashboard = () => {
         </Card>
       </div>
 
-      {/* Current Status Alert */}
+      {/* Alerts Section */}
       {currentStatus && (
-        <Card className="mb-6 border-l-4 border-l-yellow-500">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-yellow-500" />
-              <CardTitle>Current Status</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-foreground">
-              <strong>Stage:</strong> {currentStatus.current_stage}
-              {isCaseCompleted(currentStatus) && (
-                <span className="ml-2 text-green-600 font-semibold">✓ Case Completed</span>
-              )}
-              {currentStatus.current_stage === "Benign Result" && !isCaseCompleted(currentStatus) && (
-                <span className="ml-2 text-green-600 font-semibold">✓ Benign Result</span>
-              )}
-              {currentStatus.current_stage === "Malignant Result" && !isCaseCompleted(currentStatus) && (
-                <span className="ml-2 text-red-600 font-semibold">⚠ Malignant Result</span>
-              )}
-            </p>
-            {currentStatus.completion_reason && (
-              <p className="text-foreground mt-2">
-                <strong>Completion Reason:</strong> {currentStatus.completion_reason}
-              </p>
-            )}
-            {currentStatus.completion_date && (
-              <p className="text-foreground mt-1">
-                <strong>Completed On:</strong> {formatDateDDMMYYYY(currentStatus.completion_date)}
-              </p>
-            )}
-            {currentStatus.findings && (
-              <p className="text-foreground mt-2">
-                <strong>Latest Findings:</strong> {currentStatus.findings}
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        <>
+          {currentStatus.alert === "overdue" && (
+            <Card className="mb-6 border-l-4 border-l-destructive">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5 text-destructive" />
+                  <CardTitle>Action Required</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-foreground">
+                  Your case requires immediate attention from your provider. Please contact your healthcare team.
+                </p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  <strong>Current Stage:</strong> {currentStatus.current_stage}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+          
+          {currentStatus.alert === "warning" && (
+            <Card className="mb-6 border-l-4 border-l-yellow-500">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-yellow-600" />
+                  <CardTitle>Upcoming Action</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-foreground">
+                  Your case has an upcoming milestone. Your provider will contact you soon.
+                </p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  <strong>Current Stage:</strong> {currentStatus.current_stage}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Current Status Alert */}
+          {currentStatus.alert === "normal" && (
+            <Card className="mb-6 border-l-4 border-l-primary">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5 text-primary" />
+                  <CardTitle>Current Status</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-foreground">
+                  <strong>Stage:</strong> {currentStatus.current_stage}
+                  {isCaseCompleted(currentStatus) && (
+                    <span className="ml-2 text-green-600 font-semibold">✓ Case Completed</span>
+                  )}
+                  {currentStatus.current_stage === "Benign Result" && !isCaseCompleted(currentStatus) && (
+                    <span className="ml-2 text-green-600 font-semibold">✓ Benign Result</span>
+                  )}
+                  {currentStatus.current_stage === "Malignant Result" && !isCaseCompleted(currentStatus) && (
+                    <span className="ml-2 text-red-600 font-semibold">⚠ Malignant Result</span>
+                  )}
+                </p>
+                {currentStatus.completion_reason && (
+                  <p className="text-foreground mt-2">
+                    <strong>Completion Reason:</strong> {currentStatus.completion_reason}
+                  </p>
+                )}
+                {currentStatus.completion_date && (
+                  <p className="text-foreground mt-1">
+                    <strong>Completed On:</strong> {formatDateDDMMYYYY(currentStatus.completion_date)}
+                  </p>
+                )}
+                {currentStatus.findings && (
+                  <p className="text-foreground mt-2">
+                    <strong>Latest Findings:</strong> {currentStatus.findings}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
 
       {/* All Cases - Separate Entries */}
@@ -268,61 +311,167 @@ const PatientDashboard = () => {
         </Card>
       )}
 
-      {/* Timeline */}
-      {cases.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Your Care Journey</CardTitle>
-            <CardDescription>
-              Track your progress through each stage of care
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              {cases.map((caseItem, index) => (
-                <div key={caseItem.id} className="flex gap-4">
-                  {/* Icon Column */}
-                  <div className="flex flex-col items-center">
-                    {getStatusIcon(caseItem)}
-                    {index < cases.length - 1 && (
-                      <div className="w-0.5 h-16 bg-border mt-2" />
-                    )}
-                  </div>
+      {/* Care Journey - Stage-based Timeline */}
+      {cases.length > 0 && (() => {
+        // Define standard care journey stages
+        const careStages = [
+          { id: "new", label: "New Case", description: "Initial consultation and case creation" },
+          { id: "imaging", label: "Initial Imaging", description: "CT scan/imaging performed and reviewed" },
+          { id: "biopsy_pending", label: "Biopsy Pending", description: "Planning and scheduling for biopsy" },
+          { id: "biopsy_performed", label: "Biopsy Performed", description: "Biopsy completed, awaiting results" },
+          { id: "mdc_review", label: "MDC Review", description: "Multidisciplinary conference review" },
+          { id: "imaging_followup", label: "Imaging Follow-up", description: "Follow-up imaging scheduled" },
+          { id: "results", label: "Results", description: "Pathology results received" },
+          { id: "treatment", label: "Treatment Plan", description: "Treatment plan established" },
+        ];
 
-                  {/* Content Column */}
-                  <div className="flex-1 pb-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-semibold text-foreground">{caseItem.current_stage}</h4>
-                      {getStatusBadge(caseItem)}
+        // Get the most recent case to determine current stage
+        const currentCase = cases[cases.length - 1];
+        const currentStageValue = currentCase.current_stage || "New Case";
+        
+        // Determine which stages are completed, current, or pending
+        const getStageStatus = (stageLabel: string) => {
+          if (isCaseCompleted(currentCase)) {
+            // If case is completed, all stages are completed
+            return "completed";
+          }
+          
+          // Map stage labels to determine progress
+          const stageMap: { [key: string]: number } = {
+            "New Case": 0,
+            "Initial Imaging": 1,
+            "Biopsy Pending": 2,
+            "Biopsy Performed": 3,
+            "MDC Review": 4,
+            "Imaging Follow-up": 5,
+            "Benign Result": 6,
+            "Malignant Result": 6,
+            "Treatment Plan": 7,
+          };
+
+          const currentIndex = stageMap[currentStageValue] ?? 0;
+          const stageIndex = stageMap[stageLabel] ?? -1;
+
+          if (stageIndex < 0) return "pending";
+          if (stageIndex < currentIndex) return "completed";
+          if (stageIndex === currentIndex) {
+            // Check if it's a result stage
+            if (currentStageValue === "Benign Result" || currentStageValue === "Malignant Result") {
+              return stageLabel === "Results" ? "current" : "pending";
+            }
+            return "current";
+          }
+          return "pending";
+        };
+
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle>Your Care Journey</CardTitle>
+              <CardDescription>
+                Track your progress through each stage of care - Updated by your provider
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {careStages.map((stage, index) => {
+                  const status = getStageStatus(stage.label);
+                  const isCompleted = status === "completed";
+                  const isCurrent = status === "current";
+                  const isPending = status === "pending";
+
+                  // Special handling for Results stage
+                  let displayLabel = stage.label;
+                  if (stage.id === "results" && isCurrent) {
+                    if (currentStageValue === "Benign Result") {
+                      displayLabel = "Benign Result";
+                    } else if (currentStageValue === "Malignant Result") {
+                      displayLabel = "Malignant Result";
+                    }
+                  }
+
+                  return (
+                    <div key={stage.id} className="flex gap-4">
+                      {/* Icon Column */}
+                      <div className="flex flex-col items-center">
+                        {isCompleted ? (
+                          <CheckCircle className="h-5 w-5 text-green-600" />
+                        ) : isCurrent ? (
+                          <Clock className="h-5 w-5 text-primary animate-pulse" />
+                        ) : (
+                          <Circle className="h-5 w-5 text-muted-foreground" />
+                        )}
+                        {index < careStages.length - 1 && (
+                          <div className={`w-0.5 h-12 mt-2 ${
+                            isCompleted ? "bg-green-600" : "bg-border"
+                          }`} />
+                        )}
+                      </div>
+
+                      {/* Content Column */}
+                      <div className="flex-1 pb-4">
+                        <div className="flex items-center justify-between mb-1">
+                          <h4 className={`font-semibold ${
+                            isCompleted ? "text-green-700" : 
+                            isCurrent ? "text-primary" : 
+                            "text-muted-foreground"
+                          }`}>
+                            {displayLabel}
+                          </h4>
+                          {isCompleted && (
+                            <Badge variant="secondary" className="bg-green-600/10 text-green-700 border-green-600/20">
+                              Completed
+                            </Badge>
+                          )}
+                          {isCurrent && (
+                            <Badge className="bg-primary text-primary-foreground">
+                              In Progress
+                            </Badge>
+                          )}
+                          {isPending && (
+                            <Badge variant="outline">
+                              Pending
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">{stage.description}</p>
+                        {isCurrent && currentCase.date_of_encounter && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Started: {formatDateDDMMYYYY(currentCase.date_of_encounter)} • 
+                            Day {getDurationDays(currentCase.date_of_encounter)}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    
-                    <div className="flex gap-4 text-sm text-muted-foreground mb-2">
-                      <span>Date: {formatDateDDMMYYYY(caseItem.date_of_encounter)}</span>
-                      <span>Day {getDurationDays(caseItem.date_of_encounter)}</span>
+                  );
+                })}
+                
+                {/* Show completion info if case is completed */}
+                {isCaseCompleted(currentCase) && (
+                  <div className="flex gap-4 mt-4 pt-4 border-t">
+                    <div className="flex flex-col items-center">
+                      <CheckCircle className="h-5 w-5 text-green-600" />
                     </div>
-                    
-                    {caseItem.classification && (
-                      <div className="text-sm text-muted-foreground mb-2">
-                        Classification: {caseItem.classification}
-                      </div>
-                    )}
-                    {caseItem.completion_reason && (
-                      <div className="text-sm text-green-700 font-medium mb-2">
-                        Completion Reason: {caseItem.completion_reason}
-                      </div>
-                    )}
-                    {caseItem.completion_date && (
-                      <div className="text-sm text-muted-foreground mb-2">
-                        Completed: {formatDateDDMMYYYY(caseItem.completion_date)}
-                      </div>
-                    )}
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-green-700">Case Completed</h4>
+                      {currentCase.completion_reason && (
+                        <p className="text-sm text-muted-foreground">
+                          Reason: {currentCase.completion_reason}
+                        </p>
+                      )}
+                      {currentCase.completion_date && (
+                        <p className="text-sm text-muted-foreground">
+                          Completed: {formatDateDDMMYYYY(currentCase.completion_date)}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Educational Timeline for Lung Mass/Nodule Management */}
       <Card className="mt-8">

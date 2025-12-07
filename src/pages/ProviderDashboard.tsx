@@ -40,70 +40,47 @@ const ProviderDashboard = () => {
   useEffect(() => {
     const fetchCases = async () => {
       try {
-        const { data, error } = await supabase
+        // Get provider email from localStorage to filter cases
+        const providerEmail = typeof window !== "undefined" ? localStorage.getItem("providerEmail") : null;
+        
+        // Build query - try to filter by provider_email if available and column exists
+        let query = supabase
           .from("cases")
-          .select("*")
-          .order("date_of_encounter", { ascending: false });
+          .select("*");
+        
+        // Only show cases created by this provider (if provider_email column exists)
+        // If column doesn't exist, show all cases as fallback
+        if (providerEmail) {
+          // Try filtering by provider_email, but if it fails, fetch all and filter client-side
+          query = query.eq("provider_email", providerEmail);
+        }
+        
+        const { data, error } = await query.order("date_of_encounter", { ascending: false });
 
-        if (error) throw error;
-        if (data) {
-          const mappedCases = data.map((c: any) => ({
-            id: c.id,
-            patientIdentifier: c.patient_identifier,
-            institution: c.institution ?? "",
-            currentStage: c.current_stage,
-            duration: getDurationDays(c.date_of_encounter),
-            alert: c.alert ?? "normal",
-            classification: c.classification,
-            completion_reason: c.completion_reason,
-            completion_date: c.completion_date,
-            date_of_encounter: c.date_of_encounter,
-          }));
-          setCases(mappedCases);
-          
-          // Get unique patient identifiers
-          const patients = Array.from(
-            new Set(mappedCases.map((c) => c.patientIdentifier).filter(Boolean))
-          ).sort();
-          setUniquePatients(patients);
-
-          // Check for overdue cases and show notifications (only once per load)
-          if (!hasNotified) {
-            const activeCases = mappedCases.filter((c: any) => 
-              !archivedIds.includes(c.id) && 
-              !(c.currentStage?.startsWith("Completed") || c.completion_reason || c.completion_date)
-            );
+        if (error) {
+          // If error is due to missing column, try without filter
+          if (error.message?.includes("provider_email") || error.code === "PGRST116") {
+            console.warn("provider_email column may not exist, fetching all cases");
+            const { data: allData, error: allError } = await supabase
+              .from("cases")
+              .select("*")
+              .order("date_of_encounter", { ascending: false });
             
-            const overdueCases = activeCases.filter((c: any) => c.alert === "overdue");
+            if (allError) throw allError;
             
-            if (overdueCases.length > 0) {
-              // Show individual notifications for each overdue case (limit to 3 to avoid spam)
-              overdueCases.slice(0, 3).forEach((case_: any, index: number) => {
-                setTimeout(() => {
-                  toast({
-                    title: "⚠️ Overdue Case Alert",
-                    description: `Case for patient ${case_.patientIdentifier} is overdue and requires attention.`,
-                    variant: "destructive",
-                    duration: 8000,
-                  });
-                }, index * 500);
-              });
-
-              // If there are more than 3, show a summary
-              if (overdueCases.length > 3) {
-                setTimeout(() => {
-                  toast({
-                    title: "Multiple Overdue Cases",
-                    description: `You have ${overdueCases.length} overdue case(s) that need attention. Please review your dashboard.`,
-                    variant: "destructive",
-                    duration: 6000,
-                  });
-                }, 2000);
-              }
-              
-              setHasNotified(true);
-            }
+            // Filter client-side by physician field as fallback
+            const filtered = providerEmail 
+              ? (allData || []).filter((c: any) => c.physician?.toLowerCase().includes(providerEmail.toLowerCase().split("@")[0]))
+              : (allData || []);
+            
+            processCases(filtered);
+            return;
           }
+          throw error;
+        }
+        
+        if (data) {
+          processCases(data);
         }
       } catch (err) {
         console.error("Failed to load cases from Supabase", err);
@@ -112,6 +89,66 @@ const ProviderDashboard = () => {
           description: "Failed to load cases from database.",
           variant: "destructive",
         });
+      }
+    };
+
+    const processCases = (caseData: any[]) => {
+      if (!caseData) return;
+      const mappedCases = caseData.map((c: any) => ({
+        id: c.id,
+        patientIdentifier: c.patient_identifier,
+        currentStage: c.current_stage,
+        duration: getDurationDays(c.date_of_encounter),
+        alert: c.alert ?? "normal",
+        classification: c.classification,
+        completion_reason: c.completion_reason,
+        completion_date: c.completion_date,
+        date_of_encounter: c.date_of_encounter,
+      }));
+      setCases(mappedCases);
+      
+      // Get unique patient identifiers
+      const patients = Array.from(
+        new Set(mappedCases.map((c) => c.patientIdentifier).filter(Boolean))
+      ).sort();
+      setUniquePatients(patients);
+
+      // Check for overdue cases and show notifications (only once per load)
+      if (!hasNotified) {
+        const activeCases = mappedCases.filter((c: any) => 
+          !archivedIds.includes(c.id) && 
+          !(c.currentStage?.startsWith("Completed") || c.completion_reason || c.completion_date)
+        );
+        
+        const overdueCases = activeCases.filter((c: any) => c.alert === "overdue");
+        
+        if (overdueCases.length > 0) {
+          // Show individual notifications for each overdue case (limit to 3 to avoid spam)
+          overdueCases.slice(0, 3).forEach((case_: any, index: number) => {
+            setTimeout(() => {
+              toast({
+                title: "⚠️ Overdue Case Alert",
+                description: `Case for patient ${case_.patientIdentifier} is overdue and requires attention.`,
+                variant: "destructive",
+                duration: 8000,
+              });
+            }, index * 500);
+          });
+
+          // If there are more than 3, show a summary
+          if (overdueCases.length > 3) {
+            setTimeout(() => {
+              toast({
+                title: "Multiple Overdue Cases",
+                description: `You have ${overdueCases.length} overdue case(s) that need attention. Please review your dashboard.`,
+                variant: "destructive",
+                duration: 6000,
+              });
+            }, 2000);
+          }
+          
+          setHasNotified(true);
+        }
       }
     };
 
@@ -186,13 +223,21 @@ const ProviderDashboard = () => {
         const mappedCases = data.map((c: any) => ({
           id: c.id,
           patientIdentifier: c.patient_identifier,
-          institution: c.institution ?? "",
           currentStage: c.current_stage,
-          duration: c.duration ?? 0,
+          duration: getDurationDays(c.date_of_encounter),
           alert: c.alert ?? "normal",
           classification: c.classification,
+          completion_reason: c.completion_reason,
+          completion_date: c.completion_date,
+          date_of_encounter: c.date_of_encounter,
         }));
         setCases(mappedCases);
+        
+        // Get unique patient identifiers
+        const patients = Array.from(
+          new Set(mappedCases.map((c) => c.patientIdentifier).filter(Boolean))
+        ).sort();
+        setUniquePatients(patients);
       }
     } catch (err) {
       toast({
@@ -277,6 +322,101 @@ const ProviderDashboard = () => {
               </CardContent>
             </Card>
           </div>
+        );
+      })()}
+
+      {/* Alerts Section */}
+      {(() => {
+        const overdueCases = activeCases.filter((c) => c.alert === "overdue");
+        const warningCases = activeCases.filter((c) => c.alert === "warning");
+        
+        if (overdueCases.length === 0 && warningCases.length === 0) {
+          return null;
+        }
+
+        return (
+          <Card className="mb-6 border-l-4 border-l-destructive">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-destructive" />
+                <CardTitle>Active Alerts</CardTitle>
+              </div>
+              <CardDescription>Cases requiring immediate attention</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {overdueCases.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant="destructive" className="flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        Overdue ({overdueCases.length})
+                      </Badge>
+                    </div>
+                    <div className="space-y-1">
+                      {overdueCases.slice(0, 5).map((case_) => (
+                        <div key={case_.id} className="flex items-center justify-between p-2 bg-destructive/10 rounded-md">
+                          <div className="flex items-center gap-2">
+                            <AlertCircle className="h-4 w-4 text-destructive" />
+                            <span className="text-sm font-medium">
+                              <button
+                                onClick={() => navigate(`/provider/patient/${case_.patientIdentifier}`)}
+                                className="text-primary hover:underline"
+                              >
+                                {case_.patientIdentifier}
+                              </button>
+                              {" - "}{case_.currentStage}
+                            </span>
+                          </div>
+                          <span className="text-xs text-muted-foreground">{case_.duration} days</span>
+                        </div>
+                      ))}
+                      {overdueCases.length > 5 && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          + {overdueCases.length - 5} more overdue case(s)
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {warningCases.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge className="bg-yellow-500 hover:bg-yellow-600 flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        Due Soon ({warningCases.length})
+                      </Badge>
+                    </div>
+                    <div className="space-y-1">
+                      {warningCases.slice(0, 5).map((case_) => (
+                        <div key={case_.id} className="flex items-center justify-between p-2 bg-yellow-500/10 rounded-md">
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-4 w-4 text-yellow-600" />
+                            <span className="text-sm font-medium">
+                              <button
+                                onClick={() => navigate(`/provider/patient/${case_.patientIdentifier}`)}
+                                className="text-primary hover:underline"
+                              >
+                                {case_.patientIdentifier}
+                              </button>
+                              {" - "}{case_.currentStage}
+                            </span>
+                          </div>
+                          <span className="text-xs text-muted-foreground">{case_.duration} days</span>
+                        </div>
+                      ))}
+                      {warningCases.length > 5 && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          + {warningCases.length - 5} more case(s) due soon
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         );
       })()}
 
@@ -469,6 +609,56 @@ const ProviderDashboard = () => {
           </button>
         </CardContent>
       </Card>
+
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle className="text-lg">Timeline for Management (Lung Mass/Nodules)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <div className="min-w-[900px] border border-border rounded-md">
+              <div className="grid grid-cols-8 divide-x divide-border bg-muted/60">
+                <div className="px-3 py-2 text-center font-semibold text-sm">Week 1</div>
+                <div className="px-3 py-2 text-center font-semibold text-sm">Week 2</div>
+                <div className="px-3 py-2 text-center font-semibold text-sm">Week 3</div>
+                <div className="px-3 py-2 text-center font-semibold text-sm">Week 4</div>
+                <div className="px-3 py-2 text-center font-semibold text-sm">Week 5</div>
+                <div className="px-3 py-2 text-center font-semibold text-sm">Week 6</div>
+                <div className="px-3 py-2 text-center font-semibold text-sm">Week 7</div>
+                <div className="px-3 py-2 text-center font-semibold text-sm">Week 8</div>
+              </div>
+              <div className="grid grid-cols-8 divide-x divide-border">
+                <div className="px-3 py-4 text-xs text-center">
+                Initial consult; CT ordered; scheduling; clinical baseline recorded
+                </div>
+                <div className="px-3 py-4 text-xs text-center">
+                CT completed; radiology report reviewed; assess nodule characteristics
+                </div>
+                <div className="px-3 py-4 text-xs text-center">
+                MDC planning; biopsy method selection; biopsy scheduled
+                </div>
+                <div className="px-3 py-4 text-xs text-center">
+                Biopsy performed; histopathology processing initiated
+                </div>
+                <div className="px-3 py-4 text-xs text-center">
+                Pathology report reviewed; determine need for further tests
+                </div>
+                <div className="px-3 py-4 text-xs text-center">
+                Additional tests or repeat biopsy (if needed)
+                </div>
+                <div className="px-3 py-4 text-xs text-center">
+                Pre-treatment preparation; integrate clinical + pathology + imaging data
+                </div>
+                <div className="px-3 py-4 text-xs text-center">
+                Therapeutic MDC; final treatment plan established
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+
     </DashboardLayout>
   );
 };

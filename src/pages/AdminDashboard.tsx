@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Search, Download, Users, Activity, AlertTriangle, TrendingUp } from "lucide-react";
+import { Search, Download, Users, Activity, AlertTriangle, TrendingUp, Clock } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "@/hooks/use-toast";
 
@@ -30,7 +30,6 @@ const AdminDashboard = () => {
             id: c.id,
             patientId: c.patient_identifier,
             provider: c.physician ?? "—",
-            institution: c.institution ?? "—",
             stage: c.current_stage,
             duration: c.duration ?? 0,
             alert: c.alert ?? "normal",
@@ -101,7 +100,6 @@ const AdminDashboard = () => {
         id: c.id,
         patientId: c.patientId,
         provider: c.provider,
-        institution: c.institution,
         stage: c.stage,
         duration: c.duration,
         alert: c.alert,
@@ -144,7 +142,7 @@ const AdminDashboard = () => {
   };
 
   return (
-    <DashboardLayout title="Admin/Navigator Dashboard">
+    <DashboardLayout title="Admin Dashboard">
       {/* System Statistics */}
       <div className="grid md:grid-cols-4 gap-4 mb-8">
         <Card>
@@ -204,6 +202,102 @@ const AdminDashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Alerts Section */}
+      {(() => {
+        const overdueCases = allCases.filter((c) => !isCaseCompleted(c) && c.alert === "overdue");
+        const warningCases = allCases.filter((c) => !isCaseCompleted(c) && c.alert === "warning");
+        
+        if (overdueCases.length === 0 && warningCases.length === 0) {
+          return null;
+        }
+
+        return (
+          <Card className="mb-6 border-l-4 border-l-destructive">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+                <CardTitle>System Alerts</CardTitle>
+              </div>
+              <CardDescription>Cases requiring immediate attention across all providers</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {overdueCases.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant="destructive" className="flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" />
+                        Overdue ({overdueCases.length})
+                      </Badge>
+                    </div>
+                    <div className="space-y-1">
+                      {overdueCases.slice(0, 5).map((case_) => (
+                        <div key={case_.id} className="flex items-center justify-between p-2 bg-destructive/10 rounded-md">
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle className="h-4 w-4 text-destructive" />
+                            <span className="text-sm font-medium">
+                              <button
+                                onClick={() => navigate(`/admin/patient/${case_.patientId}`)}
+                                className="text-primary hover:underline"
+                              >
+                                {case_.patientId}
+                              </button>
+                              {" - "}{case_.stage} (Provider: {case_.provider})
+                            </span>
+                          </div>
+                          <span className="text-xs text-muted-foreground">{case_.duration} days</span>
+                        </div>
+                      ))}
+                      {overdueCases.length > 5 && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          + {overdueCases.length - 5} more overdue case(s)
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {warningCases.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge className="bg-yellow-500 hover:bg-yellow-600 flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        Due Soon ({warningCases.length})
+                      </Badge>
+                    </div>
+                    <div className="space-y-1">
+                      {warningCases.slice(0, 5).map((case_) => (
+                        <div key={case_.id} className="flex items-center justify-between p-2 bg-yellow-500/10 rounded-md">
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-4 w-4 text-yellow-600" />
+                            <span className="text-sm font-medium">
+                              <button
+                                onClick={() => navigate(`/admin/patient/${case_.patientId}`)}
+                                className="text-primary hover:underline"
+                              >
+                                {case_.patientId}
+                              </button>
+                              {" - "}{case_.stage} (Provider: {case_.provider})
+                            </span>
+                          </div>
+                          <span className="text-xs text-muted-foreground">{case_.duration} days</span>
+                        </div>
+                      ))}
+                      {warningCases.length > 5 && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          + {warningCases.length - 5} more case(s) due soon
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
       {/* Filters and Search */}
       <Card className="mb-6">
         <CardContent className="pt-6">
@@ -233,7 +327,6 @@ const AdminDashboard = () => {
                   "Case ID",
                   "Patient ID",
                   "Provider",
-                  "Institution",
                   "Current Stage",
                   "Duration (days)",
                   "Alert Status",
@@ -243,7 +336,6 @@ const AdminDashboard = () => {
                   c.id,
                   c.patientId,
                   c.provider,
-                  c.institution,
                   c.stage,
                   c.duration,
                   c.alert,
@@ -281,7 +373,7 @@ const AdminDashboard = () => {
         <CardHeader>
           <CardTitle>System Overview</CardTitle>
           <CardDescription>
-            Monitor all cases across providers & institutions
+            Monitor all cases across providers
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -294,9 +386,6 @@ const AdminDashboard = () => {
                   </th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-foreground">
                     Provider
-                  </th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-foreground">
-                    Institution
                   </th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-foreground">
                     Current Stage
@@ -329,9 +418,6 @@ const AdminDashboard = () => {
                     </td>
                     <td className="py-3 px-4 text-sm text-muted-foreground">
                       {item.provider}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-muted-foreground">
-                      {item.institution || "—"}
                     </td>
                     <td className="py-3 px-4 text-sm text-foreground">
                       {item.stage}

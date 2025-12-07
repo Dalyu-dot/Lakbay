@@ -15,6 +15,7 @@ const NewCase = () => {
   const today = new Date().toISOString().split("T")[0];
   const [formData, setFormData] = useState({
     patientId: "",
+    patientName: "",
     dateOfEncounter: today,
     physician: "",
     classification: "",
@@ -86,11 +87,15 @@ const NewCase = () => {
         ? "Pulmonary mass with extrathoracic malignancy"
         : "Unspecified";
 
+    // Get provider email from localStorage
+    const providerEmail = typeof window !== "undefined" ? localStorage.getItem("providerEmail") : null;
+
     // Save to Supabase `cases` table
     try {
-      const { error } = await supabase.from("cases").insert({
+      const insertData: any = {
         id: caseId,
         patient_identifier: formData.patientId,
+        patient_name: formData.patientName || null,
         current_stage: "New Case",
         duration: 0,
         alert: "normal",
@@ -101,7 +106,14 @@ const NewCase = () => {
         imaging_date: formData.imagingDate || null,
         imaging_type: formData.imagingType || null,
         findings: formData.findings || null,
-      });
+      };
+
+      // Only add provider_email if column exists (graceful degradation)
+      if (providerEmail) {
+        insertData.provider_email = providerEmail;
+      }
+
+      const { error } = await supabase.from("cases").insert(insertData);
 
       if (error) {
         console.error("Supabase insert error:", error);
@@ -231,7 +243,14 @@ const NewCase = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
                     <div className="space-y-2">
-                    {/* Removed Patient Name input */}
+                      <Label htmlFor="patientName">Patient Name *</Label>
+                      <Input
+                        id="patientName"
+                        placeholder="Enter patient's full name"
+                        value={formData.patientName}
+                        onChange={(e) => handleChange("patientName", e.target.value)}
+                        required
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="physician">Physician Name *</Label>
