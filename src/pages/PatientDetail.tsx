@@ -71,6 +71,11 @@ const PatientDetail = () => {
 
     setEditingAlertOnly(false);
     setEditingCaseId(caseItem.id);
+    // Format date for input (YYYY-MM-DD)
+    const encounterDate = caseItem.date_of_encounter 
+      ? new Date(caseItem.date_of_encounter).toISOString().split("T")[0]
+      : new Date().toISOString().split("T")[0];
+    
     setEditForm({
       current_stage: caseItem.current_stage,
       alert: caseItem.alert,
@@ -78,6 +83,7 @@ const PatientDetail = () => {
       physician: caseItem.physician || "",
       symptoms: caseItem.symptoms || "",
       findings: caseItem.findings || "",
+      date_of_encounter: encounterDate,
     });
   };
 
@@ -215,6 +221,11 @@ const PatientDetail = () => {
           symptoms: editForm.symptoms,
           findings: editForm.findings,
         };
+
+        // Update date_of_encounter (start date) if provided - this affects Days in Care calculation
+        if (editForm.date_of_encounter) {
+          updateData.date_of_encounter = editForm.date_of_encounter;
+        }
 
         // Providers can update provider name
         if (editForm.physician) {
@@ -371,6 +382,19 @@ const PatientDetail = () => {
                             // Provider can edit all fields
                             <>
                               <div className="grid md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label>Start Date (Encounter Date) *</Label>
+                                  <Input
+                                    type="date"
+                                    value={editForm.date_of_encounter || ""}
+                                    onChange={(e) =>
+                                      setEditForm({ ...editForm, date_of_encounter: e.target.value })
+                                    }
+                                  />
+                                  <p className="text-xs text-muted-foreground">
+                                    This date is used to calculate "Days in Care" on the patient dashboard
+                                  </p>
+                                </div>
                                 <div className="space-y-2">
                                   <Label>Current Stage</Label>
                                   <Select
