@@ -31,6 +31,15 @@ const PatientDetail = () => {
   const canComplete = isProvider || isAdmin; // Both providers and admins can complete cases
   const canEditAlert = isAdmin || isProvider; // Both can edit alert status
 
+  const getDurationDays = (dateStr: string | null | undefined) => {
+    if (!dateStr) return 0;
+    const start = new Date(dateStr).getTime();
+    const now = Date.now();
+    if (Number.isNaN(start)) return 0;
+    const diffDays = Math.floor((now - start) / (1000 * 60 * 60 * 24));
+    return diffDays < 0 ? 0 : diffDays;
+  };
+
   useEffect(() => {
     const fetchCases = async () => {
       if (!patientId) return;
@@ -383,7 +392,7 @@ const PatientDetail = () => {
                             <>
                               <div className="grid md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                  <Label>Start Date (Encounter Date) *</Label>
+                                  <Label>Start Date *</Label>
                                   <Input
                                     type="date"
                                     value={editForm.date_of_encounter || ""}
@@ -392,7 +401,7 @@ const PatientDetail = () => {
                                     }
                                   />
                                   <p className="text-xs text-muted-foreground">
-                                    This date is used to calculate "Days in Care" on the patient dashboard
+                                   Reflects on patient dashboard as Days in Care
                                   </p>
                                 </div>
                                 <div className="space-y-2">
@@ -528,7 +537,7 @@ const PatientDetail = () => {
                             </div>
                             <div>
                               <p className="text-sm font-medium text-muted-foreground">Duration</p>
-                              <p className="text-sm">{caseItem.duration} days</p>
+                              <p className="text-sm">{getDurationDays(caseItem.date_of_encounter)} days</p>
                             </div>
                           </div>
                           {caseItem.symptoms && (
